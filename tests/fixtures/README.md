@@ -103,3 +103,17 @@ ffmpeg -y -ss <From> -i "<source>" -t <length> -an \
 `ffmpeg` and `ffprobe` must be on `PATH`. On the machine these fixtures were probed on, the only copy was
 the one bundled with Krita (`C:\Program Files\Krita (x64)\bin`), and it was not on `PATH`. The plans
 support the environment variable `OSBMPEG_FFMPEG_DIR` to point at that folder.
+
+## Planned tier: `authored` (decision D14, 2026-10-29)
+
+Motion graphics, UI and 2D animation are the priority content and none of the tiers above contain any.
+The `authored` tier is built right after M1 (step R1 in `docs/implementation-plan.md` §12.1). It has
+three sources, none of which is committed as video:
+
+| Source | Ground truth | How it gets here | License note |
+| --- | --- | --- | --- |
+| Storyboard generator (`tools/OsbMpeg.DatasetGen`) | full program (`.osb` + assets), per `docs/direction.md` §6.5 | generated with a seed, rendered by `SoftwareStoryboardRenderer`, encoded with ffmpeg x264 CRF 16 | ours |
+| Crello Animation (`cyberagent/crello-animation` on Hugging Face) | per-sprite static texture, per-frame affine matrix and opacity; 50 frames at 10 fps, 2 to 6 layers, 299 templates | download script renders each template to `.mp4` into the fixture cache | CDLA-Permissive-2.0 for the dataset, and the user must accept the VistaCreate license; original files are not redistributed, so do not commit renders |
+| Animation2Code (`anim2code/dataset` on Hugging Face) | HTML/CSS/JS that produced the video | download script, videos rendered deterministically by their environment | check the dataset card license before use; do not commit |
+
+Runs at `native` since all of it is short and small. Window selection rules above do not apply.

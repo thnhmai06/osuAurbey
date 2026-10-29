@@ -87,6 +87,16 @@ tùy biến, lookahead.
 | D10 | Plan chi tiết cho phần trước mắt; phần chưa biết chỉ nêu concept và khả thi | Mục 8 chi tiết (Phase A, M0, M0.5, M1). Mục 12 chỉ concept. |
 | D11 | Nhiều tiến trình OsbMpeg chạy song song trên cùng thư mục asset phải an toàn | Hợp đồng "tạo nếu chưa có" nguyên tử (mục 5.1). Ghi file tạm rồi rename, không bao giờ ghi đè. |
 
+Bổ sung 2026-10-29, sau review concept Aurbey v2 (`docs/aurbey-review.md`):
+
+| ID | Quyết định | Hệ quả thi công |
+| --- | --- | --- |
+| D12 | **Không có khái niệm object hay thực thể ngữ nghĩa.** Đơn vị làm việc là *thay đổi liên kết* (coherent change): vùng không-thời gian lớn nhất mà một primitive trong ladder giải thích được trong sàn. "Sprite" là hệ quả của việc một track Sim(2) giải thích được một vùng, không phải đầu vào. | Không có kênh prompt, không có bước "định danh object". Layer được *đề xuất* bằng tín hiệu motion (block flow, sequential RANSAC Sim(2), liên thông không gian, prior thời gian) và được *nhận* chỉ khi closed loop đo thấy rẻ hơn. Re-identification xuyên che khuất và xuyên scene là canonical hash của asset (I10), không phải ID của tracker. |
+| D13 | **Lõi là .NET thuần; model học chỉ ở sidecar tùy chọn.** SAM 2/3, MatAnyone hoặc tương đương chạy trong tiến trình Python riêng, chỉ để *tinh chỉnh biên* (alpha matte) của layer đã được đề xuất bằng motion. Không có sidecar thì pipeline vẫn chạy đầy đủ. | Contract `ILayerBoundaryRefiner` (mục 12.2). Sidecar chỉ được xây sau khi attribution (M3.5) chỉ ra bucket "mép layer" đủ lớn. Không thêm ONNX hay PyTorch vào assembly `OsbMpeg`. |
+| D14 | **Ưu tiên nội dung được author**: motion graphics, UI, 2D animation. Game và footage vẫn phải không tệ đi (verify pass, bytes không tăng), nhưng không là mục tiêu tối ưu trong 6 tháng tới. | Thêm tier fixture `authored` (mục 9.2 và `tests/fixtures/README.md`). Nâng R1 (dataset có ground truth chương trình) và R2 (easing rời rạc) từ research track lên lộ trình, ngay sau M1 và M2 tương ứng. Nâng motion layer K>1 từ DEFER lên M2.5 với keep-gate đo trên tier `authored`. |
+| D15 | **Thứ tự: closed loop trước, provider sau.** Phase A → M0 → M0.5 → M1 giữ nguyên. Không spike SAM hay Sim(2) trên code v1. | Mọi số đo về layer, easing, additive đều phải là số đo *sau* verify. Spike A1 đến A5 trong `aurbey-review.md` mục 6 chạy trên nền M1/M2, không sớm hơn. |
+| D16 | **Những phần của `aurbey.md` bị bỏ**, với lý do ghi ở `aurbey-review.md` mục 3: SAM làm xương sống (D12); freeze gate so với frame trước (vòng hở); nền động bằng `Animation` (R4); cubic Bézier và curve tùy ý (không có trong `.osb`); dedupe theo pHash Hamming (pop); cost function trọng số tay (predict thua measure); pHash/MIH/HNSW; sub-entity vệt sáng qua SAM. | Không viết code cho các mục này. Những phần của `aurbey.md` được giữ: Sim(2) thay affine; `C` đóng dạng với master là frame sáng nhất; additive layer `Base + α(t)·Light` với base theo percentile, chỉ trong hệ sprite đã bù chuyển động; easing rời rạc + piecewise + chọn theo error + λ·complexity; canonical asset + instance; nền tĩnh median không ảo giác, lỗ để trong suốt cho closed loop vá. |
+
 ---
 
 ## 3. Override so với `docs/direction.md`
@@ -1307,6 +1317,46 @@ D7 riêng.
 | **Nguồn frame tùy biến** | Overload public nhận `IAsyncEnumerable` frame RGB24 kèm metadata, bỏ phụ thuộc ffmpeg. | Khả thi; encoder đã tách khỏi ffmpeg. | Có consumer thật cần. |
 | **Memo toàn kết quả** | Compile lại cùng (nội dung video, tham số) trả ngay kết quả cũ mà không decode. Cache hiện tại chỉ bỏ qua encode và ghi PNG; decode, encode loop và verify vẫn chạy. | Khả thi. Cần một key cho input (hash file video cộng tham số) và một nơi lưu object, tức một file ngoài asset, nên phải cân nhắc với D9. | Người dùng xác nhận cần "compile lại tức thì". |
 | **Đóng gói NuGet** | `PackageId`, versioning, README trong gói. | Dễ. | Khi người dùng muốn phát hành. |
+
+### 12.1 Lộ trình sau M1 (đã chốt thứ tự theo D14, D15)
+
+| Bước | Nội dung | Vào từ | Keep-gate (đo trên tier `authored` + `standard` của medium/hard) |
+| --- | --- | --- | --- |
+| R1 | Generator dataset có ground truth chương trình (direction 6.5) + loader Crello Animation và Animation2Code + metric tầng hai (`complexity_ratio`, `representation_confusion`, `trajectory_rmse`, `asset_recall`, `occlusion_consistency`) | ngay sau M1 | là instrument, không gate; sai lệch tier rẻ so với render thật là phát hiện |
+| M2 | `TransformTrackProvider` K=1 + sub-segment theo motion (direction 9.4) | sau R1 | như direction |
+| R2 | Easing rời rạc (35 easing của osu!, không tham số tự do ngoài `(v0,v1)`) + piecewise bằng changepoint (PELT hoặc DP) + chọn theo error + λ·complexity, áp cho mọi track vô hướng | ngay sau M2 | ≥ 30% command bytes trên `authored`, 0 verify regression |
+| M2.5 | `MotionLayerSetProvider` K ≤ 4 theo coherent change (mục 12.2): đề xuất layer bằng motion, support mask từ inlier block tinh chỉnh tới pixel bằng màu/biên (classical), z-order từ sự kiện occlusion, nền = layer support lớn nhất (panorama T6 khi camera động), canonical asset theo pose chuẩn hóa, additive layer cho glow | sau R2 | trên `authored`: bytes ≤ 0,5× M2 và sprite ≤ 0,2× M2, verify 100%; trên medium/hard: bytes không tăng quá 2%, verify 100% |
+| M3, M3.5 | Animation có cap resident, ngân sách workload, encoding asset, attribution | như cũ | như cũ |
+| Sidecar | `ILayerBoundaryRefiner` bằng SAM 2/3 + MatAnyone trong tiến trình Python | sau M3.5 | chỉ xây khi bucket "mép layer" ≥ 20% bytes hoặc verify fail tập trung ở biên layer trên 2D animation |
+
+### 12.2 M2.5: layer theo coherent change, contract và bản đồ vấn đề → cơ chế
+
+Contract provider (tất cả in-proc, .NET):
+
+```text
+LayerProposal   := { supportMask(t) (block-level, rồi pixel-level), Sim(2) track khởi tạo, zHint }
+ILayerProposer  := frames → LayerProposal[]          (Classical: block flow + sequential RANSAC + liên thông)
+ILayerBoundaryRefiner := (frames, supportMask(t)) → alpha(t) trong dải biên   (Classical: guided filter / trapped-ball; Sidecar: SAM+MatAnyone, sau)
+MotionLayerSetProvider : ICandidateProvider          (nhận proposal, dựng candidate T5, closed loop đo)
+```
+
+Mỗi vấn đề trong `aurbey-review.md` mục 2 và 5 đã có chỗ giải:
+
+| Vấn đề | Cơ chế | Ở bước |
+| --- | --- | --- |
+| Đếm và khởi tạo layer không cần người | matching pursuit: thêm layer khi lợi ích biên đo được lớn hơn chi phí biên (direction 5.7 tầng 1); K ≤ 4 | M2.5 |
+| Tương ứng điểm cho Sim(2) trên nội dung ít texture | hai đường: KLT trong support khi có texture; ECC/ảnh-trực-tiếp trên pixel khi không (khởi tạo bằng flow block + RANSAC) | M2 (K=1), M2.5 |
+| Mép layer, matte đổi theo frame | một alpha canonical cho cả run; sai số mép là error đo trên composite; vượt sàn thì crossfade hoặc patch, không phát asset mỗi frame | M2.5 |
+| Re-identification xuyên che khuất và scene | canonical hash theo pose chuẩn (direction 5.4); tracker không giữ ID | M2.5 |
+| z-order | đồ thị ràng buộc từ sự kiện occlusion + topological sort; chu trình = hạ giả thuyết (direction 6.2) | M2.5 |
+| Nền chưa từng lộ, nền parallax | lỗ để trong suốt, closed loop vá khi lộ; parallax = thêm layer hoặc rơi về T2 | M2.5 |
+| Drift chậm (freeze gate) | closed loop so với asset đang hiển thị, `ErrorMap` sau `AdvanceTo` | M1 |
+| Chi phí dự đoán sai | chi phí đo: bytes sau encode PNG, workload từ timeline; ràng buộc cứng không trọng số | M1, M3 |
+| Nền động, thrash | T2 có cap; `Animation` chỉ cho vùng nhỏ với cap resident bytes | M3 |
+| Glow, flash | additive layer: base = percentile thấp trong hệ sprite đã bù chuyển động, light = max delta, α(t) đóng dạng; gate clamp và SSIM | M2.5 |
+| Easing không "lossless" trên nội dung không author | fallback keyframe RDP khi không easing nào đạt epsilon screen-space | R2 |
+| Group transform của `AnimationVideo` | mọi track của layer đi qua baker theo single-writer (I5) | M2 |
+| Near-duplicate asset | vẫn REJECT; chỉ canonical exact hash | giữ nguyên |
 
 ---
 

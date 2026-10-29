@@ -19,6 +19,10 @@ pass straight through to output IR unchanged.
 
 ## Read this before designing anything
 
+`docs/implementation-plan.md` is the top source for what to build next (Phase A → M1, decisions D1 to D16,
+post-M1 order in §12.1); it overrides `docs/direction.md` where §3 says so. `docs/aurbey-review.md` is the
+review of the `aurbey.md` concept and records why its SAM-first and cost-weight parts were dropped (D12, D16).
+
 `docs/direction.md` is the single source for where this project is going: what is broken in the
 current implementation and why, what osu! storyboards can actually express, the representation
 space, the target architecture with its invariants, a step-by-step implementation roadmap
