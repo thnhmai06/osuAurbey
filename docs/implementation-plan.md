@@ -8,9 +8,12 @@ hướng.
 
 ## 0. Cách dùng tài liệu này
 
-**Thứ tự ưu tiên nguồn.** Tài liệu này đứng trên `docs/direction.md`, và `direction.md` đứng trên code
-hiện tại. Khi hai tài liệu mâu thuẫn, tài liệu này thắng; toàn bộ override được liệt kê ở mục 3.
-`direction.md` vẫn là nguồn cho *lý do* (chẩn đoán, sự thật về osu!, lịch sử đo ở mục 13 của nó).
+**Thứ tự ưu tiên nguồn.** Tài liệu này là nguồn cho *xây gì*: mọi quyết định đã chốt (mục 2),
+kiến trúc và invariants (mục 4), từng bước từ Phase A tới M1 (mục 8) và lộ trình sau M1 (mục 12).
+`docs/direction.md` là nguồn cho *lý do*: chẩn đoán, sự thật về osu!, không gian representation, bảng
+bác bỏ (mục 8 của nó), prior art (mục 10) và lịch sử đo (mục 11). Hai tài liệu không override nhau:
+phát hiện mâu thuẫn thì sửa tài liệu sai, không thêm bảng ngoại lệ. `docs/feasibility-plan.md` mô tả
+spike kiểm chứng chạy trước Phase A.
 
 **Mỗi bước** trong mục 8 ghi rõ: mục tiêu, file, API, thuật toán, test, acceptance, và những gì
 không được làm. Mỗi bước kết thúc bằng: build Release sạch, toàn bộ test xanh, đúng một commit theo
@@ -71,7 +74,7 @@ tùy biến, lookahead.
 
 ---
 
-## 2. Quyết định đã chốt (người dùng, 2026-09-28) và hệ quả bắt buộc
+## 2. Quyết định đã chốt (người dùng, 2026-09-28 và 2026-10-29) và hệ quả bắt buộc
 
 | ID | Quyết định | Hệ quả thi công |
 | --- | --- | --- |
@@ -84,42 +87,25 @@ tùy biến, lookahead.
 | D7 | `Fps` = số frame chương trình xử lý và biểu diễn mỗi giây. Ép video về fps đó rồi xử lý tiếp; frame bị loại được frame trước đại diện. | Resample bằng filter `fps=` của ffmpeg (đã có trong `FrameSource`). `null` nghĩa là fps nguồn. Fps lớn hơn nguồn chỉ tốn thời gian, không đổi output, nên không cần xử lý riêng. |
 | D8 | Không CLI; chỉ core engine | Xóa `OsbMpeg.Cli` và test của nó. Harness đo nằm trong test project (mục 9). |
 | D9 | Được đổi format, nhưng quy tắc đặt tên asset phải nhất quán và **chỉ phụ thuộc nội dung pixel**. Tối ưu truy vấn, không tạo file hoặc folder vô nghĩa. | Key = XXH3-128 trên (tag phiên bản, format pixel, kích thước, pixel cuối cùng được lưu). Bỏ seed `colors`. Animation lưu phẳng, không mỗi animation một folder. Không file index, không file phụ. |
-| D10 | Plan chi tiết cho phần trước mắt; phần chưa biết chỉ nêu concept và khả thi | Mục 8 chi tiết (Phase A, M0, M0.5, M1). Mục 12 chỉ concept. |
+| D10 | Plan chi tiết cho phần trước mắt; phần chưa biết chỉ nêu concept và khả thi | Mục 8 chi tiết (Phase A, M0, M0.5, M1). Mục 12 là spec mức bước cho phần sau M1, chi tiết file và test viết khi tới lượt. |
 | D11 | Nhiều tiến trình OsbMpeg chạy song song trên cùng thư mục asset phải an toàn | Hợp đồng "tạo nếu chưa có" nguyên tử (mục 5.1). Ghi file tạm rồi rename, không bao giờ ghi đè. |
-
-Bổ sung 2026-10-29, sau review concept Aurbey v2 (`docs/aurbey-review.md`):
-
-| ID | Quyết định | Hệ quả thi công |
-| --- | --- | --- |
 | D12 | **Không có khái niệm object hay thực thể ngữ nghĩa.** Đơn vị làm việc là *thay đổi liên kết* (coherent change): vùng không-thời gian lớn nhất mà một primitive trong ladder giải thích được trong sàn. "Sprite" là hệ quả của việc một track Sim(2) giải thích được một vùng, không phải đầu vào. | Không có kênh prompt, không có bước "định danh object". Layer được *đề xuất* bằng tín hiệu motion (block flow, sequential RANSAC Sim(2), liên thông không gian, prior thời gian) và được *nhận* chỉ khi closed loop đo thấy rẻ hơn. Re-identification xuyên che khuất và xuyên scene là canonical hash của asset (I10), không phải ID của tracker. |
-| D13 | **Lõi là .NET thuần; model học chỉ ở sidecar tùy chọn.** SAM 2/3, MatAnyone hoặc tương đương chạy trong tiến trình Python riêng, chỉ để *tinh chỉnh biên* (alpha matte) của layer đã được đề xuất bằng motion. Không có sidecar thì pipeline vẫn chạy đầy đủ. | Contract `ILayerBoundaryRefiner` (mục 12.2). Sidecar chỉ được xây sau khi attribution (M3.5) chỉ ra bucket "mép layer" đủ lớn. Không thêm ONNX hay PyTorch vào assembly `OsbMpeg`. |
-| D14 | **Ưu tiên nội dung được author**: motion graphics, UI, 2D animation. Game và footage vẫn phải không tệ đi (verify pass, bytes không tăng), nhưng không là mục tiêu tối ưu trong 6 tháng tới. | Thêm tier fixture `authored` (mục 9.2 và `tests/fixtures/README.md`). Nâng R1 (dataset có ground truth chương trình) và R2 (easing rời rạc) từ research track lên lộ trình, ngay sau M1 và M2 tương ứng. Nâng motion layer K>1 từ DEFER lên M2.5 với keep-gate đo trên tier `authored`. |
-| D15 | **Thứ tự: closed loop trước, provider sau.** Phase A → M0 → M0.5 → M1 giữ nguyên. Không spike SAM hay Sim(2) trên code v1. | Mọi số đo về layer, easing, additive đều phải là số đo *sau* verify. Spike A1 đến A5 trong `aurbey-review.md` mục 6 chạy trên nền M1/M2, không sớm hơn. |
-| D16 | **Những phần của `aurbey.md` bị bỏ**, với lý do ghi ở `aurbey-review.md` mục 3: SAM làm xương sống (D12); freeze gate so với frame trước (vòng hở); nền động bằng `Animation` (R4); cubic Bézier và curve tùy ý (không có trong `.osb`); dedupe theo pHash Hamming (pop); cost function trọng số tay (predict thua measure); pHash/MIH/HNSW; sub-entity vệt sáng qua SAM. | Không viết code cho các mục này. Những phần của `aurbey.md` được giữ: Sim(2) thay affine; `C` đóng dạng với master là frame sáng nhất; additive layer `Base + α(t)·Light` với base theo percentile, chỉ trong hệ sprite đã bù chuyển động; easing rời rạc + piecewise + chọn theo error + λ·complexity; canonical asset + instance; nền tĩnh median không ảo giác, lỗ để trong suốt cho closed loop vá. |
+| D13 | **Lõi là .NET thuần; model học chỉ ở sidecar tùy chọn.** SAM 2/3, MatAnyone hoặc tương đương chạy trong tiến trình Python riêng, chỉ để *tinh chỉnh biên* (alpha matte) của layer đã được đề xuất bằng motion. Không có sidecar thì pipeline vẫn chạy đầy đủ. | Contract `ILayerBoundaryRefiner` (mục 12.5, sidecar ở 12.9). Sidecar chỉ được xây sau khi attribution (M3.5) chỉ ra bucket "mép layer" đủ lớn. Không thêm ONNX hay PyTorch vào assembly `OsbMpeg`. |
+| D14 | **Ưu tiên nội dung được author**: motion graphics, UI, 2D animation. Game và footage vẫn phải không tệ đi (verify pass, bytes không tăng), nhưng không là mục tiêu tối ưu trong 6 tháng tới. | Thêm tier fixture `authored` (mục 9.2 và `tests/fixtures/README.md`). R1 (dataset có ground truth chương trình) đi ngay sau M1, R2 (easing rời rạc) ngay sau M2, motion layer K>1 là M2.5 với keep-gate đo trên tier `authored` (mục 12.1). |
+| D15 | **Thứ tự: closed loop trước, provider sau.** Phase A → M0 → M0.5 → M1 giữ nguyên. Không spike SAM hay Sim(2) trên code v1. | Mọi số đo về layer, easing, additive đều phải là số đo *sau* verify. Spike về layer, Sim(2), easing và additive (mục 12.5, 12.6) chạy trên nền M1 và M2, không sớm hơn. |
+| D16 | **Các hướng đã bác bỏ có bằng chứng, không đề xuất lại** (bảng quyết định, `direction.md` mục 8): tracking ngữ nghĩa làm xương sống; freeze gate so với frame trước (vòng hở, chính là lỗi mờ của v1); nền động hay vùng lớn bằng `Animation` (R4); cubic Bézier và curve tham số tự do (không có trong `.osb`); dedupe theo pHash hay fuzzy không verify pixel (pop); cost function dự đoán với trọng số tay (đo thật thua 2,6 đến 5,4 lần); value-chaining và `[Variables]`. | Không viết code cho các mục này; muốn đảo thì phải có số đo nêu trong cột "điều gì đảo nó" của bảng đó. Những kỹ thuật được giữ cho M2.5: Sim(2) thay affine; `C` đóng dạng với master là frame sáng nhất; additive layer `Base + α(t)·Light` với base theo percentile, chỉ trong hệ sprite đã bù chuyển động; easing rời rạc + piecewise + chọn theo error + λ·complexity; canonical asset + instance; nền tĩnh median không ảo giác, lỗ để trong suốt cho closed loop vá. |
 
 ---
 
-## 3. Override so với `docs/direction.md`
+## 3. Quan hệ với `docs/direction.md`
 
-| Chỗ trong direction.md | Thay bằng |
-| --- | --- |
-| Mọi thứ về CLI: 2.3 `--quality`, S0.5 subcommand `verify` và exit code, M0.5 subcommand `calibrate`, S1.1 flag, S1.11 "giữ chữ ký CLI `compile`", dòng "CLI report, exit code" ở 8.5, OQ-6 | `CompileOptions.Quality`; `OsbMpegCompiler.VerifyAsync` trả `VerificationReport`; calibration là code internal chạy qua harness test. Không còn exit code. OQ-6 đóng: xóa hết hidden command. |
-| `.osbv` và passthrough object native (1, 8.4, S1.11 "giữ grammar `.osbv`") | Không còn. Caller tự dựng `Storyboard` của họ; OsbMpeg chỉ sinh object cho một video. |
-| `VideoSourcePlanner`, shared decode nhiều member | Xóa. Mỗi lần gọi một video. Nhiều video dùng chung decode là concept (mục 12). |
-| `ScenePrePass`/`SceneBounds` được giữ | Xóa. Closed loop tự thấy hard cut: gần như mọi block vi phạm cùng lúc. Quy tắc cut ở S1.8. M2 sẽ cần segmenter riêng (mục 12). |
-| R9, S3.4, acceptance M3 về value-chaining | REJECT: lazer chỉ parse cặp giá trị đầu [deepwiki: `LegacyStoryboardDecoder`], và header của `OsbWriter` đã ghi sẵn điều này. |
-| R5 và S0.4 "`S` và `V` đụng nhau trên Scale" | Hai property riêng theo lazer. Validator chỉ cảnh báo khi `S` và `V` cùng sống trên một object (rủi ro cho stable). |
-| JPEG là MUST ở M3 | INVESTIGATE. Doc comment ở `AssetStore.cs` ghi JPEG đã đo tệ hơn: +6,5% trên anime, +62,6% trên bad_apple. |
-| 6.1 "render cài hai lần độc lập" | Sửa cho đúng: encoder dùng display model riêng (S1.2), còn verifier dùng renderer IR. Hai bản thật sự độc lập. Evaluator dùng chung vẫn cần golden test (S0.1). |
-| S0.5 verify so với "frame decode" | So `expected(t)` với `actual(t)`, cả hai render bằng cùng renderer, có áp group transform (mục 7). |
-| S1.6 và S1.7: Photometric dùng `F` khi phần dưới là đen | Chỉ dùng `C`. Trong output, video nằm trên nội dung storyboard khác, nên fade bằng `F` sẽ làm lộ phần bên dưới video thay vì cho ra màu đen như nguồn. |
-| S1.2: ReconstructionState composite IR qua `CommandEvaluator` và `Compositor` | Composite trên display model riêng (rect căn pixel, track alpha và tint tuyến tính từng đoạn). Nhanh hơn và độc lập với renderer IR. |
-| Asset layout `s/{hash}.png`, `a/{hash}/f{n}.png`, hash seed bằng `colors`, không gồm kích thước | Mục 5.3. |
-| Mỗi milestone ghi A/B so với "bản hiện tại" | So với tag `v1-baseline` (bước A1). |
-
-Những gì **giữ nguyên**: invariants I1 đến I10 (đã điều chỉnh ở mục 4.5), bảng bác bỏ (mục 11 của
-direction), cơ chế ladder, headroom và hysteresis, preset hai trục (PSNR mỗi frame, worst-tile SSIM),
-M0.5 là điểm dừng chờ người.
+Không có override. `direction.md` đã được viết lại để khớp mọi quyết định ở mục 2: không CLI, không
+`.osbv`, không scene pre-pass, không shared decode; `S` và `V` là hai property riêng; value-chaining và
+`[Variables]` bị bác; JPEG là INVESTIGATE; photometric chỉ dùng `C`; encoder composite trên display model
+riêng còn verifier render IR; mọi A/B so với tag `v1-baseline`. Những gì tài liệu này **lấy nguyên** từ
+đó: cơ chế ladder, headroom và hysteresis, preset hai trục (PSNR mỗi frame, worst-tile SSIM), M0.5 là
+điểm dừng chờ người, bảng bác bỏ (mục 8 của nó), và lịch sử đo (mục 11 của nó, nơi mọi acceptance ghi
+số).
 
 ---
 
@@ -298,20 +284,37 @@ validate VideoAnimation (mục 10.1)
 
 ### 4.5 Invariants
 
-I1 đến I10 của `direction.md` giữ nguyên ý, với các điều chỉnh sau:
+Mọi code, hiện tại và tương lai, phải giữ. Vi phạm là bug kiến trúc, không phải lựa chọn phong cách.
 
-- **I1.** IR nội bộ là ngôn ngữ chung *bên trong*. Ranh giới public là OsuParsers, và chỉ có đúng một
-  converter hai chiều (`OsuParsersConverter`).
-- **I2.** Verification độc lập: output đi qua vòng text (`StoryboardWriter`, rồi
-  `StoryboardDecoder` của OsuParsers, rồi IR) trước khi render bằng renderer IR. Encoder dùng display
-  model riêng.
-- **I5.** Property theo lazer, tính theo từng `SbCommandKind` sau khi IR đã tách `M` thành
-  `MoveX`/`MoveY` và `V` thành `VectorScaleX`/`VectorScaleY`. Người ghi duy nhất cho command của output
-  là `EmitContext.Finalize` (kể cả khi đi qua baker).
-- **I10.** Dedupe duy nhất là key nội dung của `AssetIndex` (mục 5.3).
-
-Invariants mới:
-
+- **I1.** IR nội bộ (`SbDocument`, `SbObject`, `SbCommand`) là ngôn ngữ chung duy nhất *bên trong*.
+  Mọi representation, hiện có hay thêm sau, phát ra `SbSprite` hoặc `SbAnimation` cùng command chuẩn
+  vào `SbDocument`; không có kênh phụ, không có "gợi ý cho renderer" nằm ngoài IR. Ranh giới public là
+  OsuParsers, và chỉ có đúng một converter hai chiều (`OsuParsersConverter`).
+- **I2.** Verification độc lập là thẩm quyền cuối. Output đi qua vòng text (`StoryboardWriter`, rồi
+  `StoryboardDecoder` của OsuParsers, rồi IR) trước khi render bằng renderer IR; verifier không dùng
+  `ReconstructionState` in-memory của encoder. Encoder dùng display model riêng. Dùng chung thư viện
+  tầng thấp (`Compositor`, `CommandEvaluator`) thì được, khác nhau ở orchestration và nguồn dữ liệu.
+- **I3.** Chuỗi fallback luôn kết thúc ở `PatchProvider`, và provider cuối này không bao giờ fail vì nó
+  chỉ crop từ frame nguồn. Mọi optimization fail thì rơi xuống bậc dưới, cùng lắm là patch. Đắt thì
+  được, sai thì không.
+- **I4.** Confidence và heuristic không bao giờ thay pixel check. Motion confidence, hash equality, RDP
+  error, tracking score, mask của bất kỳ model nào chỉ dùng để *đề xuất* candidate. Mọi commit phải qua
+  pixel-level evaluate đạt sàn trước.
+- **I5.** Mỗi property có một người ghi duy nhất, và `PropertyOverlapValidator` gate mọi output. Property
+  theo lazer, tính theo từng `SbCommandKind` sau khi IR đã tách `M` thành `MoveX`/`MoveY` và `V` thành
+  `VectorScaleX`/`VectorScaleY`; `S` và `V` là hai property riêng, validator chỉ cảnh báo khi cả hai
+  cùng sống trên một object. Người ghi duy nhất cho command của output là `EmitContext.Finalize` (kể
+  cả khi đi qua baker). Validator chạy sau khi flatten loop và làm compile fail khi phát hiện chồng lấn.
+- **I6.** Sàn tuyệt đối theo từng frame và từng tile. Vượt ngân sách thì đổi representation hoặc báo
+  violation, không bao giờ âm thầm hạ sàn.
+- **I7.** Thêm representation mới nghĩa là thêm `ICandidateProvider` (và nếu cần, một analyzer đề xuất
+  giả thuyết), không sửa lõi `ClosedLoopEncoder`, `ReconstructionState` hay verifier. Danh sách provider
+  kèm rank là bắt buộc từ M1; ladder viết thành chuỗi if là vi phạm.
+- **I8.** Mọi số tạm phải được calibrate bằng đo trước khi trở thành gate.
+- **I9.** Chạy attribution sau mỗi milestone lớn; feature mới chỉ sinh ra từ dữ liệu bucket, không từ
+  tên feature nghe hay.
+- **I10.** Dedupe duy nhất là key nội dung của `AssetIndex` (mục 5.3). Mở rộng (chuẩn hóa pose, biến thể
+  encoding) phải là mở rộng của key, không phải một cơ chế song song.
 - **I11.** Library không bao giờ xóa hay ghi đè một asset đã tồn tại. Ngoại lệ duy nhất là file tạm của
   chính nó đã quá hạn (mục 5.2).
 - **I12.** Không có state toàn cục thay đổi được, trừ lock của OsuParsers. Cấu hình ffmpeg đi theo từng
@@ -329,6 +332,22 @@ Invariants mới:
     hổng trên vùng nguồn màu đen (letterbox, cảnh tối) trở thành lỗi đo được.
 
   Có test cấu trúc: sau frame 0, tại mọi frame, mọi block đều có chủ, kể cả với input có letterbox.
+- **I15.** Lõi `OsbMpeg` không phụ thuộc model học, PyTorch hay ONNX (D13). Thứ cần model chạy trong
+  tiến trình riêng và giao tiếp bằng file mask và alpha qua một contract internal; thiếu nó, pipeline
+  vẫn chạy đầy đủ với provider classical.
+
+### 4.6 Kiểm tra ngược: kiến trúc có mở không
+
+Câu hỏi kiểm tra: tuần sau phát hiện một representation mới tốt hơn mọi cái hiện có, có thêm được như
+một candidate mà không phải viết lại `ClosedLoopEncoder`, `ReconstructionState` hay verifier không? Có,
+vì bốn lý do. Lõi encoder chỉ biết `ICandidateProvider` và `IRepresentationCandidate`, nên thêm nghĩa là
+thêm class rồi đăng ký vào danh sách provider kèm rank. `ReconstructionState` composite từ *object IR*
+trong display list chứ không từ "loại representation", nên nó render được candidate mới mà không cần
+biết đó là gì; điều kiện duy nhất là primitive động mới nằm trong tập command mà `CommandEvaluator`
+đánh giá được, và tập đó chính là toàn bộ command space của `.osb`. Verifier render từ output đã qua
+vòng text nên theo định nghĩa không biết representation nào sinh ra nó. Giả thuyết phân rã mới (layer
+set, panorama, sau này là bất cứ gì) chỉ là một analyzer mới ghi thêm vào `SceneMotionInfo` cộng một
+provider mới tiêu thụ nó.
 
 ---
 
@@ -538,7 +557,7 @@ Commit: `test: probe OsuParsers 1.7.2 storyboard API`.
 **A1. Baseline v1.**
 
 Nếu `docs/feasibility.md` đã có số V0 (baseline v1 trên cùng nguồn ở mục 9.2), **dùng lại** số đó,
-chép vào mục 13.7 của `direction.md` và bỏ qua bước 1 đến 3. Nếu chưa có thì làm như sau:
+chép vào mục 11.7 của `direction.md` và bỏ qua bước 1 đến 3. Nếu chưa có thì làm như sau:
 
 1. `git tag v1-baseline` trên commit cuối cùng còn có CLI v1 (tag local, không push). Nếu tag đã tồn
    tại thì giữ nguyên.
@@ -548,7 +567,7 @@ chép vào mục 13.7 của `direction.md` và bỏ qua bước 1 đến 3. Nế
    `AnimationVideo,Background,Centre,"<đường dẫn tuyệt đối tới nguồn>",320,240,0`, rồi chạy exe CLI
    `src/OsbMpeg.Cli/bin/Release/net10.0/osbmpeg.exe in.osbv out/x.osb out/x_assets`. Thêm thư mục ffmpeg
    vào `PATH` của tiến trình nếu cần.
-4. Ghi các số sau vào mục 13.7 mới của `direction.md` ("Baseline v1 trên nguồn chuẩn"): wall time,
+4. Ghi các số sau vào mục 11.7 mới của `direction.md` ("Baseline v1 trên nguồn chuẩn"): wall time,
    `.osb` bytes, asset bytes, số asset, sprite, animation, command.
 5. Không commit output. Output để ở `%TEMP%/osbmpeg-baseline/`.
 
@@ -701,12 +720,11 @@ Commit: `refactor: internalize implementation, lock public API surface`.
 - `CLAUDE.md`: viết lại phần "What this is", Commands (test project mới, không CLI), Architecture
   (một assembly, public API, storage), Conventions (mục 5 và 6 tóm tắt). Giữ quy tắc về baker và
   ppy/osu#7257.
-- `direction.md`: thêm banner đầu file trỏ tới tài liệu này và mục 3.
 - `README.md` ngắn: ví dụ dùng library, gồm `new FileSystemAssetStorage(beatmapDir)`, `CompileAsync`,
   `AddTo`, `StoryboardWriter.Write`, cùng lưu ý R8 (`WidescreenStoryboard: 1` nằm trong `.osu`) và lưu ý
   ffmpeg.
 
-Commit: `docs: library-first CLAUDE.md, README and direction banner`.
+Commit: `docs: library-first CLAUDE.md and README`.
 
 **Acceptance Phase A:** build sạch; mọi test xanh; fixture nhẹ ở A5 xanh; snapshot API được commit; không
 còn project Cli; số baseline v1 đã được ghi.
@@ -879,7 +897,7 @@ Commit: `feat(verification): independent quality verifier wired into compile`.
 
 **Acceptance M0:** mọi test xanh; positive control pass 100%; negative control có vi phạm; bảng verify
 (min, p1, mean PSNR và TileSsim) của mọi fixture (nguồn theo mục 9.2) với encoder legacy được ghi vào
-mục 13 của `direction.md`.
+mục 11 của `direction.md`.
 
 ### 8.3 M0.5: calibrate preset (điểm dừng chờ người)
 
@@ -910,7 +928,7 @@ internal sealed class ErrorMap
 - Test: ảnh giống hệt thì toàn `Clean`; nhiễu cục bộ đúng một block; hỏng SSIM một tile thì 16 block
   `Violating`; kích thước lẻ.
 
-**S0.5.2. `DirtyRects`** (`Verification/DirtyRects.cs`), đúng S1.4 của direction:
+**S0.5.2. `DirtyRects`** (`Verification/DirtyRects.cs`):
 
 - connected component 4-connectivity trên block `Violating`, cộng block `NearFloor` "đã chín" (do
   caller đánh dấu);
@@ -937,7 +955,7 @@ Test: hình L, hai đảo tách rời, full frame 1920×1080 (ra 4 rect ≤ 1024
 feasibility V2 đã có bảng thì chỉ chạy lại để xác nhận. Ghi
 `%TEMP%/osbmpeg-calibration/<fixture>.md` (bảng) và các PNG.
 
-**S0.5.5. Dừng.** Agent chép bảng vào mục 13 của `direction.md`, rồi trình cho người dùng: bảng, đường
+**S0.5.5. Dừng.** Agent chép bảng vào mục 11 của `direction.md`, rồi trình cho người dùng: bảng, đường
 dẫn ảnh, và đề xuất ba bộ số High, Medium, Low kèm lý do (tránh bộ nào có % refresh gần 100% trên nội
 dung sạch). **Chờ người dùng chốt.** Sau đó commit số vào `QualityPreset`, cập nhật mục 2.3 của
 direction, cập nhật file snapshot API nếu cần.
@@ -1111,7 +1129,7 @@ với mỗi frame i:
 kết thúc: EmitContext.FinalizeAll(localMs(FrameCount))
 ```
 
-Ngưỡng cut 0,7 lấy từ lịch sử `CutThreshold` (mục 13.6 của direction). Test: hai ảnh tĩnh nối bằng hard
+Ngưỡng cut 0,7 lấy từ lịch sử `CutThreshold` (mục 11.6 của direction). Test: hai ảnh tĩnh nối bằng hard
 cut cho đúng một I-frame tại điểm cắt; video tĩnh cho đúng một lượt patch ở frame 0; bộ đếm hysteresis
 đúng.
 
@@ -1119,7 +1137,7 @@ cut cho đúng một I-frame tại điểm cắt; video tĩnh cho đúng một l
 
 - `CompilePipeline` thay `LegacyTileEncoder` bằng `ClosedLoopEncoder` với danh sách provider
   `[Patch]`.
-- Chạy acceptance 1, rồi ghi bảng A/B vào mục 13.
+- Chạy acceptance 1, rồi ghi bảng A/B vào mục 11 của `direction.md`.
 
 Commit: `feat(encoder): closed-loop patch encoder replaces legacy tile encoder`.
 
@@ -1179,7 +1197,7 @@ dưới 5 MB). Cả bốn file đều H.264 CRF 12, yuv420p.
 
 Commit: `refactor: remove legacy tile encoder`.
 
-**Acceptance M1** (ghi mọi số vào mục 13 của direction):
+**Acceptance M1** (ghi mọi số vào mục 11 của direction):
 
 1. Qua verifier độc lập, 100% frame đạt `Medium` (số của M0.5) trên mọi fixture thật (nguồn theo mục
    9.2) và 4 fixture synthetic. Report ở mức `High` được ghi lại nhưng không phải gate.
@@ -1296,67 +1314,298 @@ D7 riêng.
 - Cache: compile lại cùng nội dung tạo 0 asset mới. Nhiều instance hoặc tiến trình dùng chung thư mục
   không có lỗi, không ghi đè, không còn file tạm.
 - Encoder closed loop với Patch, Photometric và Crossfade. Verify độc lập pass `Medium` trên mọi fixture.
-- Mọi acceptance của Phase A, M0, M0.5 và M1 xanh, số liệu được ghi vào mục 13 của `direction.md`.
+- Mọi acceptance của Phase A, M0, M0.5 và M1 xanh, số liệu được ghi vào mục 11 của `direction.md`.
 - `CLAUDE.md` và `README.md` phản ánh kiến trúc mới.
 
 ---
 
-## 12. Concept cho phần sau (chỉ ý tưởng và khả thi; mỗi mục sẽ có plan riêng khi tới lượt)
+## 12. Lộ trình sau M1
+
+Mỗi bước dưới đây có spec đủ để bắt đầu; chi tiết file và test được viết thêm khi tới lượt, cùng kiểu với
+mục 8. Mọi số đo ghi vào mục 11 của `direction.md`; mọi A/B so với bước ngay trước và với `v1-baseline`.
+
+### 12.1 Thứ tự và keep-gate
+
+| Bước | Nội dung | Vào từ | Keep-gate (đo trên tier `authored` cộng `standard` của medium và hard) |
+| --- | --- | --- | --- |
+| R1 | Dataset có ground truth chương trình, tier `authored`, metric tầng hai (12.2) | ngay sau M1 | là instrument, không gate; sai lệch tier rẻ so với render thật là phát hiện |
+| M2 | `TransformTrackProvider` K=1 cộng sub-segment theo motion (12.3) | sau R1 | acceptance trong 12.3 |
+| R2 | Easing rời rạc cộng piecewise trong `TrajectoryFitter` (12.4) | ngay sau M2 | ≥ 30% command bytes trên `authored`, 0 verify regression; trượt thì giữ RDP linear |
+| M2.5 | `MotionLayerSetProvider` K ≤ 4 theo coherent change (12.5, 12.6) | sau R2 | trên `authored`: bytes ≤ 0,5× M2 và sprite ≤ 0,2× M2, verify 100%; trên medium và hard: bytes không tăng quá 2%, verify 100%; trượt thì quay về DEFER tới M3.5 |
+| M3 | Ngân sách workload, `Animation` có cap, encoding asset (12.7) | sau M2.5 (ngân sách và animation có thể sớm hơn nếu số của M1 đòi) | acceptance trong 12.7 |
+| M3.5 | Attribution và quy trình quyết định (12.8) | sau M3 | không phải feature |
+| Sidecar | `ILayerBoundaryRefiner` bằng model matting trong tiến trình Python (12.9) | sau M3.5 | chỉ xây khi bucket `layer-edge` ≥ 20% bytes hoặc verify fail tập trung ở biên layer trên 2D animation |
+
+### 12.2 R1: dataset ground truth, tier `authored`, metric tầng hai
+
+Theo `direction.md` 6.5. Ba nguồn, không nguồn nào commit video (xem `tests/fixtures/README.md`):
+
+- `tools/OsbMpeg.DatasetGen` (project console riêng, không đụng assembly `OsbMpeg`): template theo
+  category (tĩnh; một transform đơn `M`, `S`, `R`; từng họ easing; fade; colour; crossfade; pan; zoom; nhiều
+  sprite; layered motion kèm occlusion; flipbook; loop; hỗn hợp; nhóm mập mờ), có seed, render bằng
+  `StoryboardRenderer` ra frame lossless rồi ffmpeg x264 CRF 16, kèm `metadata.json` và `source.osb`.
+- Loader Crello Animation (`cyberagent/crello-animation`): texture 256×256 RGBA, ma trận warp và opacity
+  mỗi frame cho 2 đến 6 sprite, 50 frame ở 10 fps; render ra `.mp4` vào cache fixture. Ground truth là
+  chương trình (texture + affine + opacity), chuyển về IR để tính metric tầng hai.
+- Loader Animation2Code (`anim2code/dataset`): video cộng HTML/CSS/JS; chỉ dùng video và metadata, kiểm
+  license trước khi tải.
+
+Metric tầng hai (`complexity_ratio`, `representation_confusion`, `missing_primitive_attribution`,
+`trajectory_rmse`, `asset_recall`, `occlusion_consistency`) theo bảng ở `direction.md` 6.5, giữ riêng
+từng metric, không score tổng hợp, không metric nào làm gate. Harness `Category=Fixture` in bảng theo
+category. Acceptance R1: generator sinh được mọi category với seed cố định và round-trip render khớp
+golden; hai loader chạy được trên máy có mạng và skip sạch khi không; bảng metric tầng hai chạy trên
+output M1 của toàn tier `authored`.
+
+### 12.3 M2: motion K=1 dưới interface layer-set
+
+Mục đích: hết nặng trên pan và zoom, vì nội dung do camera dịch chuyển ngừng bị re-emit mỗi frame.
+Phụ thuộc M1 và R1. Không làm: K lớn hơn 1 (M2.5), panorama (DEFER tới M3.5), camera rotation (bỏ ở bản
+này, thêm khi attribution đòi, `R` đã sẵn). Scene pre-pass không còn, nên M2 phải tự có segmenter (S2.3)
+và dùng quy tắc cut của `ClosedLoopEncoder` (S1.8) làm ranh giới cứng.
+
+**S2.0 Spike ước lượng (MUST, trước khi xây phần còn lại).** Block matching chỉ translation trên
+`pan_synthetic` và fish_spinning 5 giây, đo inlier ratio và residual. Quyết: block matching đủ, hay
+cần pyramidal, hay cần DIS flow, theo đúng thứ tự đó (learned flow đã REJECT, `direction.md` 5.6). Phạm vi an
+toàn: code spike ném đi được, chỉ số liệu ghi vào mục 11 của `direction.md` mới là deliverable.
+
+**S2.1 FlowField (MUST, thuật toán theo kết quả S2.0).** Phương án mặc định: downscale luma xuống tối
+đa 256px (decode pass A riêng), mỗi block 16×16 tìm SAD trong bán kính ±12px, 3 mức pyramid nếu S2.0
+đòi. Output là vector thưa kèm confidence theo SAD.
+
+**S2.2 MotionModelFitter (MUST).** RANSAC similarity không rotation: model `(tx,ty,s)`, 2 điểm mỗi
+mẫu, inlier là residual dưới 1px ở full-res, 64 vòng lặp. Interface trả
+`IReadOnlyList<MotionLayer>`, bản này luôn 0 hoặc 1 phần tử, nhưng là layer-set ngay từ ngày đầu.
+Gate hai tầng, cả hai phải đạt: inlier ít nhất 60% trong ít nhất 70% số frame; và diện tích residual
+dự kiến (phần camera model không giải thích được) không quá 25% diện tích frame, tính trung bình trên
+scene. Gate thứ hai tồn tại vì riêng inlier ratio cho phép accept một layer mà 40% frame vẫn phải
+patch mỗi frame *chồng lên* một base sprite full-res cũng đang trả tiền; gate này đo thẳng cái quyết
+định net win. Không đạt gate nào thì trả list rỗng và scene chạy thuần patch cộng crossfade, an toàn
+tuyệt đối vì motion layer chỉ là optimization.
+
+**S2.3 MotionSegmenter (MUST).** Từ chuỗi model mỗi frame: đoạn có `|v| < ε` kéo dài ít nhất 500ms
+thành segment tĩnh, chuyển tiếp có hysteresis 300ms. Output là scene chia thành các segment
+`[(t0, t1, MotionLayer?)]`. Encoder chạy theo từng segment, và I-frame ở đầu segment rơi ra tự nhiên
+từ quy tắc I-frame của `ClosedLoopEncoder` (S1.8), chính là keyframe tại điểm đổi chế độ. Không tách segment cho thay đổi motion nhẹ, vì
+overhead keyframe tự trả giá trong cost và ladder tự quyết.
+
+**S2.4 TrajectoryFitter (MUST).** RDP joint: điểm là `(tx,ty,s)` mỗi frame, hàm khoảng cách là *dịch
+chuyển lớn nhất của 4 góc frame* dưới transform đã compose, so giữa đường nội suy và giá trị thật,
+tính bằng osu!px, epsilon tạm 0,3. Không chạy RDP riêng từng thành phần với epsilon theo đơn vị vị
+trí: sai số scale Δs tốn `Δs·|x−c|` px, lớn nhất ở góc ảnh và gần như vô hình với epsilon đo trên
+(tx, ty). Simplify joint cũng giữ breakpoint của `MX`, `MY`, `S` đồng bộ, nên ba track đọc được như một.
+
+Ghi chú toán: với `p(u) = p₀ + uΔp` và `s(u) = s₀ + uΔs`, vị trí màn hình của một điểm ảnh cố định x
+là `y(u) = p₀ + s₀(x−c) + u·[Δp + Δs(x−c)]`, tức tuyến tính theo u trên mỗi segment. Nên M và S nội
+suy tuyến tính đồng thời là đúng, chỉ có phép đo sai số phải nằm trong screen space.
+
+**S2.5 TransformTrackProvider và fold vào baker (MUST).** Không có baker: sprite base full-frame (crop
+tại keyframe đầu segment), origin Centre, emit `MX`, `MY`, `S` keyframe linear từ trajectory, giải
+`p(t)` và `s(t)` từ `screen = p(t) + s(t)·(x−c)`.
+
+Có baker thì phải giữ single-writer (I5): `GroupTransformBaker.BakeTracked(cameraSamples, ...)` compose
+bằng cách lấy mẫu. Với mỗi frame nguồn t: lấy group transform tại t (logic `SampleAt` sẵn có) rồi
+compose với camera `(p(t), s(t))`, ra chuỗi state cuối (x, y, sx, sy, α), rồi chạy RDP joint screen
+space *một lần* trên kết quả và emit. Lý do lấy mẫu thay vì đại số: tích của hai track tuyến tính là
+bậc hai, nên đừng làm đại số piecewise.
+
+Đây chính là chỗ dễ sai nhất của toàn bộ thiết kế. `SbCommandKind` chỉ có một slot cho mỗi
+MoveX, MoveY, Scale, VectorScaleX, VectorScaleY trên mỗi object, mà `GroupTransformBaker.Bake` đã phát
+`MoveX`, `MoveY`, `VectorScaleX`, `VectorScaleY` hằng số lên *mọi* tile khi `positionConstant` đúng,
+tức trường hợp thường gặp. Nếu motion layer phát track riêng cạnh track của baker thì đó là vi phạm
+R5 và không tầng nào bắt được nếu thiếu `PropertyOverlapValidator`: `MergeAdjacentCommands` chỉ kiểm
+tính liền kề, `OsbValidator` chỉ đếm object, còn `CommandEvaluator` giải quyết chồng lấn theo kiểu
+"cái cuối trong danh sách thắng", một cách thứ ba khác cả stable lẫn lazer, nghĩa là verify có thể
+pass sạch trong khi client thật render khác đi.
+
+Base keyframe refresh: khi `ErrorMap` cho thấy vùng base (không bị patch đè) suy thoái tới ngưỡng cận
+sàn trên hơn 40% diện tích thì mở keyframe mới, chuyển bằng `CrossfadeProvider` trên vùng full-frame,
+tức tái dùng cơ chế chứ không viết riêng.
+
+Trên `authored`, flow block matching có thể không dùng được vì nội dung ít texture (OQ-2): S2.0 phải đo
+thêm hai đường cho Sim(2) là KLT trong support khi có texture và ECC trên pixel khi không, khởi tạo bằng
+flow block cộng RANSAC. Kết quả S2.0 quyết định `FlowField` có một hay hai backend.
+
+Provider rank 20, chỉ propose khi `ctx.Motion` có layer phủ region và region chưa có base đúng. Mép lộ
+ra khi pan là coverage gap có chủ đích, không thuộc layer nên đi theo ladder thường và thành patch,
+đúng như mong đợi. Guard 4K: nguồn có chiều nào vượt 3840 thì `SceneMotionInfo` trả rỗng và ghi lý do
+vào log, vì base sprite ở độ phân giải nguồn sẽ chạm `MaxTextureSize`, mà cap diện tích 17Mpx² không
+bắt được vi phạm theo từng chiều.
+
+**S2.6 Fixture (MUST).** Tier `authored` đã có từ R1; thêm hai fixture synthetic: `pan_synthetic` (ffmpeg zoompan trên ảnh tĩnh lớn) và
+`pan_foreground_synthetic` (pan cộng một sprite chuyển động độc lập chiếm khoảng 20% frame, thiết kế
+để vừa lọt gate 60/70), script tạo trong `tests/fixtures/make_synthetic.ps1` (S1.12).
+
+Acceptance M2: (1) `pan_synthetic` asset bytes không quá 1/5 so với M1; (2) minecraft 10 giây không
+quá 60% bytes so với M1; (3) `pan_foreground_synthetic` cho thấy gate hai tầng từ chối hoặc nhận đúng
+theo net win, kiểm cả hai nhánh bằng cách chỉnh kích thước foreground; (4) 100% frame vẫn đạt sàn qua
+verify độc lập; (5) scene bị từ chối motion cho output trùng byte với M1.
+
+Thứ tự M2: S2.0 → S2.1 → S2.2 → S2.4 → S2.5 (nhánh không baker) → S2.3 → S2.5 (fold baker) → S2.6 →
+acceptance.
+
+### 12.4 R2: easing rời rạc trong `TrajectoryFitter`
+
+Theo `direction.md` 6.3. Tập hàm là 35 easing của osu! (0 tới 34), không tham số tự do ngoài `(v0, v1)`
+của segment; cubic Bézier, spring hay curve tùy ý không tồn tại trong `.osb` nên không nằm trong tập.
+Bắt đầu với chín hàm (Linear, Quad và Cubic In/Out/InOut, Sine In/Out), thêm Elastic, Back, Bounce khi
+dataset R1 chỉ ra.
+
+Thuật toán: với mỗi track vô hướng đã có breakpoint từ RDP joint, với mỗi đoạn giữa hai breakpoint ứng
+viên, đánh giá mọi easing trong tập với residual dạng đóng trong screen space (cùng metric góc frame như
+S2.4); nhận easing đạt epsilon thay vì chèn keyframe. Piecewise bằng changepoint tối ưu (PELT hoặc DP
+trên số sample mỗi track, cost là residual của easing tốt nhất trên đoạn, penalty là một command); chọn
+theo `Error + λ·Complexity` với fidelity là ràng buộc cứng. Không easing nào đạt epsilon thì fallback RDP
+linear; trên quỹ đạo nhiễu kết quả phải trùng RDP hiện tại. Áp cho mọi track: x, y, scale, alpha,
+colour (Photometric và Crossfade dùng chung fitter).
+
+Acceptance R2: trên `authored`, command bytes giảm ít nhất 30% so với M2 với 0 verify regression; trên
+case generator thuộc "từng họ easing", `representation_confusion` chỉ ra easing đúng ở ít nhất 90% case
+không mập mờ; trên medium và hard, output trùng byte với M2 hoặc nhỏ hơn.
+
+### 12.5 M2.5: layer set K ≤ 4 theo coherent change
+
+Mục đích: nội dung được author (D14) là nhiều object độc lập di chuyển; K=1 không bắt được. Theo D12,
+không có bước định danh object: layer được *đề xuất* bằng motion và được *nhận* chỉ khi closed loop đo
+thấy rẻ hơn. Phụ thuộc M2 và R2.
+
+Contract, tất cả internal và in-proc:
+
+```text
+LayerProposal          := { supportMask(t) (block, rồi pixel), Sim(2) track khởi tạo, zHint }
+ILayerProposer         := frames → LayerProposal[]
+                          (Classical: block flow → sequential RANSAC Sim(2) K ≤ 4 → lọc liên thông
+                           không gian ≥ diện tích tối thiểu → prior thời gian từ frame trước)
+ILayerBoundaryRefiner  := (frames, supportMask(t)) → alpha(t) trong dải biên
+                          (Classical: guided filter, trapped-ball trên nội dung phẳng; Sidecar: 12.9)
+MotionLayerSetProvider : ICandidateProvider, rank 25 (giữa TransformTrack và Crossfade)
+```
+
+Các quyết định thiết kế, mỗi cái gắn với vấn đề nó giải:
+
+| Vấn đề | Cơ chế |
+| --- | --- |
+| Đếm và khởi tạo layer không cần người | matching pursuit (`direction.md` 5.7 tầng 1): thêm layer khi lợi ích biên đo được trên bản downscale lớn hơn chi phí biên; K ≤ 4 |
+| Tương ứng điểm cho Sim(2) trên nội dung ít texture | hai backend từ S2.0: KLT trong support khi có texture, ECC trên pixel khi không |
+| Mép layer, matte đổi theo frame | một alpha canonical cho cả run; sai số mép là error đo trên composite; vượt sàn thì crossfade hoặc patch, không bao giờ phát asset mỗi frame cho mép |
+| Re-identification xuyên che khuất và scene | canonical asset theo pose chuẩn hóa (scale về bậc lượng tử, khử rotation) rồi exact hash (I10); tracker không giữ ID |
+| z-order | đồ thị ràng buộc từ sự kiện occlusion (layer nào thắng pixel nhìn thấy) cộng topological sort; chu trình là bằng chứng phân rã sai, hạ K |
+| Nền | layer có support lớn nhất; khi camera động thì tích lũy median trong hệ panorama (T6) với confidence mask; vùng chưa từng lộ để trong suốt, closed loop vá khi lộ |
+| Glow, flash | additive layer T9: trong hệ sprite đã bù chuyển động, `Base` = percentile thấp theo thời gian (không min, vì min bị nhiễu kéo xuống), `Light` = max delta, `α(t)` đóng dạng; gate clamp ≤ 2% và SSIM; emit 2 asset cộng `P,A` và track `F` |
+| Group transform của video | mọi track của layer compose qua baker theo single-writer (I5), cùng đường với `BakeTracked` của S2.5 |
+| Nền động vì nội dung (sóng, lá) | không phải layer; rơi về T2 cộng cap, và `Animation` chỉ cho vùng nhỏ (M3) |
+| Occlusion | hệ quả của z-order cộng closed loop (`direction.md` 5.3); chỉ thêm heuristic kéo dài lifetime layer bị che nếu dự đoán sẽ lộ lại |
+
+Spike trước khi xây, mỗi cái có pass/fail chốt trước, trên `authored`, `fish-short` và `minecraft`
+`standard`:
+
+| Spike | Câu hỏi | Pass |
+| --- | --- | --- |
+| A1 | Layer từ `ILayerProposer` classical có thắng K=1 trên cùng contract không | bytes ≤ 0,7× M2 và verify 100% trên ít nhất 2 trong 3 nhóm |
+| A2 | KLT trong support so với ECC trên pixel cho Sim(2) | residual screen-space dưới 0,5 px ở ≥ 90% frame trên `authored` |
+| A4 | Additive factor với base percentile trên glow thật | worst-tile SSIM ≥ sàn với 2 asset thay vì N patch trên ít nhất một fixture có flash |
+
+Acceptance M2.5: keep-gate ở 12.1; `pan_foreground_synthetic` (S2.6) được tách thành nền cộng một layer;
+case generator "layered motion kèm occlusion" cho `occlusion_consistency` ≥ 0,9; scene bị từ chối layer cho
+output trùng byte với M2 cộng R2.
+
+### 12.6 Spike và số đo của M2.5
+
+Spike A1, A2, A4 ở 12.5 và S2.0 ở 12.3 là toàn bộ code ném đi được của giai đoạn này; deliverable là số
+trong mục 11 của `direction.md`. Spike A5 (chi phí GPU end-to-end của sidecar) chỉ chạy khi gate ở 12.9 mở.
+
+### 12.7 M3: ngân sách, animation, encoding asset
+
+Phụ thuộc M1 cho ngân sách và encoding, M2 không bắt buộc cho encoding.
+
+**S3.1 Thực thi WorkloadBudgets (MUST).** Bộ đếm cập nhật tại `Commit` (timeline SB load steady và
+transient, alive count, animation resident). `Allow(candidate)` kiểm dự phóng sau commit so với ngân
+sách ở `direction.md` 2.2. Không đạt thì encoder thử candidate hoặc provider tiếp theo, tức đổi representation chứ
+không hạ sàn (I6). PatchProvider bị ngân sách chặn về lý thuyết không xảy ra vì patch rời nhau về thời
+gian nên không tăng alive dài hạn; nếu vẫn xảy ra thì vẫn commit và ghi violation, vì fidelity thắng.
+Test: ngân sách giả nhỏ làm crossfade bị chặn và rơi về patch, bản ghi violation đúng.
+
+**S3.2 AnimationProvider và ThrashPlanner (MUST).** Pass hậu kỳ mỗi scene, không nằm trong vòng lặp
+mỗi frame. Quét lịch sử commit theo vùng: vùng có ít nhất 4 hard swap liên tiếp cách nhau đúng một
+frame và tổng span tuân cap (tối đa khoảng 120 frame, diện tích không quá tile 256px, tổng resident
+không quá 200MB mỗi scene) thì gom chuỗi patch thành một `SbAnimation` LoopOnce và xóa các sprite
+patch tương ứng khỏi document. Thao tác trên IR trước các pass, nên `EmitContext` cần hỗ trợ thay thế.
+Gate uniqueness như bản cũ (ít nhất 80% frame khác nội dung), logic đọc lại từ git history rồi viết
+gọn lại. Test: bad_apple 5 giây có animation resident trong ngân sách và giữ sàn; vùng nhấp nháy A/B
+chỉ có hai nội dung thì *không* được thành animation, vì dedupe sprite thắng.
+
+**S3.3 Tìm encoding asset (MUST cho palette có dither, INVESTIGATE cho JPEG).** JPEG đã đo *tệ hơn*
+PNG một lần (+6,5% trên anime, +62,6% trên bad_apple, doc comment `AssetStore.cs`), nên chỉ được giữ nếu
+hai điều cùng đúng: OQ-4 pass (tự tay bỏ một `.jpg` vào storyboard test, load trong osu! stable và lazer,
+xác nhận render) và đo trên `standard` của footage cho thấy giảm từ 30% mà không thủng gate. Một trong
+hai fail thì bỏ JPEG, chỉ giữ dither palette.
+
+`AssetStore.GetOrAdd(pixels, w, h, consumer, EncodingPolicy)` thử các ứng viên gồm PNG thô, PNG palette
+256/128/64 kèm Floyd-Steinberg, và JPEG q95/q90/q85 chỉ khi vùng opaque; decode lại, tính `TileSsim` so
+với gốc, yêu cầu đạt `preset.TileSsimFloor + 0.02`, rồi chọn bytes nhỏ nhất. Key = hash pixel *sau* lossy (mục 5.3, D9), nên vẫn chỉ phụ thuộc nội dung; tăng tag lên `V2` nếu đổi
+quy tắc; phần mở rộng file theo format. Quyết định được cache theo content-hash nên asset đã gặp không phải tìm lại. Test:
+gradient thì palette bị loại bởi gate SSIM, ảnh chụp thì JPEG thắng, và dedupe vẫn đúng khi hai policy
+cùng chạy trong một compile.
+
+Acceptance M3: bad_apple giữ sàn với animation trong ngân sách; palette có dither giảm asset bytes mà
+không thủng gate trên `authored` và `fish-short`; JPEG được giữ hay bỏ theo đúng hai điều kiện ở S3.3,
+ghi số; không fixture nào vượt ngân sách mặc định hoặc có violation report rõ ràng.
+
+### 12.8 M3.5: checkpoint attribution
+
+Mục đích: quyết định ưu tiên nghiên cứu tiếp theo bằng số liệu (I9). Đây không phải milestone feature.
+
+**S3.5.1 AttributionAnalyzer (MUST).** Chạy trên kết quả compile toàn corpus cộng dữ liệu trung gian
+của encoder (flow, model, commit log, serialize ra `attribution.json` khi `CompileOptions.Attribution` bật).
+
+| Bucket | Cách đo |
+| --- | --- |
+| `local-coherent-motion` | bytes của patch trong vùng mà sequential RANSAC pass 2 (chạy offline trong analyzer trên flow đã lưu) tìm được model K=2 giải thích ít nhất 70% block vùng đó |
+| `pan-reveal` | bytes của patch nằm trong dải mép ngược hướng camera translation, bề rộng dải bằng `\|v\|·Δt` |
+| `perspective-residual` | bytes patch ở vùng inlier ở tâm nhưng residual tăng theo bán kính (fit tuyến tính residual theo khoảng cách tâm, độ dốc vượt ngưỡng) |
+| `near-duplicate-assets` | bytes của asset có coarse hash (aHash 8×8) trùng asset khác nhưng exact hash khác |
+| `deformation` | patch còn lại có SSIM giữa hai lần refresh liên tiếp cùng vùng ít nhất 0,7, tức đổi có cấu trúc |
+| `noise` | phần còn lại (SSIM giữa hai lần refresh dưới 0,7), bucket không cứu được |
+
+Thêm bucket `layer-edge`: bytes của patch nằm trong dải biên (dưới 8px) của một layer đã nhận ở M2.5. Output
+là bảng phần trăm bytes theo bucket, theo từng fixture và trên toàn corpus, ghi vào mục 11 của `direction.md`.
+
+**S3.5.2 Quy trình quyết định (MUST, đây là quy trình chứ không phải code).** Bucket lớn nhất từ
+khoảng 25 đến 30% trở lên thì mở chu trình research, prototype, benchmark cho hướng tương ứng trong
+menu: Panorama, CanonicalAssetReuse, PerspectiveStrips, và sidecar `ILayerBoundaryRefiner` khi `layer-edge`
+từ 20% (mục 12.9). Bucket `noise` trội
+thì dừng, ship, và ghi giới hạn vào README. Không đặt tên M4 hay M5 trước; milestone sau M3.5 chỉ tồn
+tại sau khi attribution và benchmark của prototype thắng.
+
+Metric tầng hai của R1 (`representation_confusion`, `missing_primitive_attribution`) và oracle gap của R3
+cũng đổ vào checkpoint này bên cạnh các bucket trên.
+
+---
+
+### 12.9 Sidecar `ILayerBoundaryRefiner` (có gate)
+
+Chỉ xây khi M3.5 cho bucket `layer-edge` ≥ 20% bytes hoặc verify fail tập trung ở biên layer trên 2D
+animation. Tiến trình Python riêng (`tools/aurbey-sidecar`), vào là thư mục frame cộng support mask theo
+thời gian, ra là alpha 8-bit trong dải biên theo thời gian; lõi .NET đọc file và coi kết quả là *đề
+xuất* (I4), vẫn verify. Model chọn tại thời điểm gate mở (MatAnyone, SAM 2 hoặc SAM 3 cộng matting, hay
+thứ kế tiếp): contract không nêu tên model. Không có GPU hay không có sidecar thì pipeline chạy classical
+không đổi output. Chi phí ước lượng khi phải chạy per-object per-frame: cỡ 24 đến 47 fps mỗi object trên
+A100 cho SAM 2, chậm 3 đến 10 lần trên GPU tiêu dùng; A5 đo thật trước khi nhận.
+
+### 12.10 Concept còn lại (chỉ ý tưởng; mỗi mục sẽ có plan riêng khi tới lượt)
 
 | Hướng | Ý tưởng | Khả thi | Điều kiện để bắt đầu |
 | --- | --- | --- | --- |
-| **M2 motion K=1** | `TransformTrackProvider`: sprite base full-frame di chuyển bằng `MX`/`MY`/`S` theo global motion (block matching, RANSAC similarity, RDP joint trong screen space), fold vào baker theo single-writer. Cần segmenter riêng (scene pre-pass đã bị xóa). | Khả thi, theo direction 9.4. Rủi ro chính là chất lượng flow trên footage thật, nên spike S2.0 đi trước. | M1 xong; spike S2.0 có số. Mọi sprite đều dịch nên sẽ đụng disjoint mode khi có group alpha; cần quy tắc riêng. |
-| **Animation và thrash (M3)** | Pass hậu kỳ gom chuỗi patch đổi mỗi frame thành `Animation` LoopOnce, lưu phẳng `a/{key}{i}.png` (mục 5.3). | Khả thi; logic cũ còn trong git history (`AnimationDetector`). | Attribution hoặc số của M1 cho thấy thrash chiếm nhiều sprite. |
-| **Ngân sách workload (M3)** | `Allow(candidate)` theo SB load, alive và resident; vượt thì đổi representation, không hạ sàn. | Khả thi; `WorkloadAnalyzer` đã có ở M0. | Số peak của M1 vượt ngưỡng ở mục 2.2 của direction. |
-| **Encoding asset** | PNG palette có dither và JPEG được thử theo từng asset, chọn bytes nhỏ nhất đạt SSIM. Key = hash pixel *sau* lossy, nên vẫn chỉ phụ thuộc nội dung (D9). Tăng tag lên `V2` nếu đổi quy tắc. | Palette: khả thi. JPEG: INVESTIGATE, vì lịch sử đo cho thấy tệ hơn và cần xác nhận osu! load được (OQ-4). | Tripwire kích thước M1 báo động. |
+| **R3 oracle gap** | Chế độ đo mỗi region đánh giá mọi provider không dừng sớm, log (ladder chọn gì, rẻ nhất là gì, chênh bao nhiêu). | Khả thi, là instrument. | Sau M3; gap ≥ 10% thì nâng bộ chọn thành best-among-passing. |
+| **R4 loop synthesis** | Autocorrelation ra `L` hoặc `Animation` LoopForever. | Khả thi. | R1 hoặc attribution thấy chu kỳ phổ biến. |
+| **Panorama T6 cho pan dài** | Strip ≤ 1024 chung một trajectory (`direction.md` 5.5). | Khả thi. | Bucket `pan-reveal` ≥ 25% ở M3.5. |
+| **Perspective strips** | Chia strip, mỗi strip một similarity. | Khả thi. | Bucket `perspective-residual` ≥ 25%. |
 | **Lookahead** | Encoder trễ K frame để thấy tương lai (fade-in, chọn nội dung sáng nhất cho patch). | Khả thi; `FrameWindow` đã có. Tốn RAM theo K. | Attribution thấy nhiều patch lặp trong fade hoặc chuyển tiếp chậm. |
-| **Attribution (M3.5)** | Chia bytes theo bucket (motion cục bộ, pan-reveal, perspective, near-dup, deformation, noise), như direction 9.6. | Khả thi. | Sau M2 và M3. |
 | **Tier vàng client thật** | 5 đến 10 case chụp từ osu!lazer để ghim renderer. | Khả thi nhưng cần thao tác tay của người dùng. | Khi golden giải tích không còn đủ, ví dụ nghi ngờ lệch mipmap. |
-| **Dataset R1, easing fit R2, oracle gap R3, loop synthesis R4** | Như mục 10 của direction. | Như direction. | Như direction. |
 | **Nhiều video dùng chung decode** | API nhận nhiều `VideoAnimation` cùng file và cùng cửa sổ, decode một lần, N encoder. | Khả thi; RAM tỉ lệ N × cửa sổ. | Có consumer thật cần. |
 | **Nguồn frame tùy biến** | Overload public nhận `IAsyncEnumerable` frame RGB24 kèm metadata, bỏ phụ thuộc ffmpeg. | Khả thi; encoder đã tách khỏi ffmpeg. | Có consumer thật cần. |
-| **Memo toàn kết quả** | Compile lại cùng (nội dung video, tham số) trả ngay kết quả cũ mà không decode. Cache hiện tại chỉ bỏ qua encode và ghi PNG; decode, encode loop và verify vẫn chạy. | Khả thi. Cần một key cho input (hash file video cộng tham số) và một nơi lưu object, tức một file ngoài asset, nên phải cân nhắc với D9. | Người dùng xác nhận cần "compile lại tức thì". |
+| **Memo toàn kết quả** | Compile lại cùng (nội dung video, tham số) trả ngay kết quả cũ mà không decode. | Khả thi. Cần key cho input và một nơi lưu object ngoài asset, nên phải cân nhắc với D9. | Người dùng xác nhận cần "compile lại tức thì". |
 | **Đóng gói NuGet** | `PackageId`, versioning, README trong gói. | Dễ. | Khi người dùng muốn phát hành. |
-
-### 12.1 Lộ trình sau M1 (đã chốt thứ tự theo D14, D15)
-
-| Bước | Nội dung | Vào từ | Keep-gate (đo trên tier `authored` + `standard` của medium/hard) |
-| --- | --- | --- | --- |
-| R1 | Generator dataset có ground truth chương trình (direction 6.5) + loader Crello Animation và Animation2Code + metric tầng hai (`complexity_ratio`, `representation_confusion`, `trajectory_rmse`, `asset_recall`, `occlusion_consistency`) | ngay sau M1 | là instrument, không gate; sai lệch tier rẻ so với render thật là phát hiện |
-| M2 | `TransformTrackProvider` K=1 + sub-segment theo motion (direction 9.4) | sau R1 | như direction |
-| R2 | Easing rời rạc (35 easing của osu!, không tham số tự do ngoài `(v0,v1)`) + piecewise bằng changepoint (PELT hoặc DP) + chọn theo error + λ·complexity, áp cho mọi track vô hướng | ngay sau M2 | ≥ 30% command bytes trên `authored`, 0 verify regression |
-| M2.5 | `MotionLayerSetProvider` K ≤ 4 theo coherent change (mục 12.2): đề xuất layer bằng motion, support mask từ inlier block tinh chỉnh tới pixel bằng màu/biên (classical), z-order từ sự kiện occlusion, nền = layer support lớn nhất (panorama T6 khi camera động), canonical asset theo pose chuẩn hóa, additive layer cho glow | sau R2 | trên `authored`: bytes ≤ 0,5× M2 và sprite ≤ 0,2× M2, verify 100%; trên medium/hard: bytes không tăng quá 2%, verify 100% |
-| M3, M3.5 | Animation có cap resident, ngân sách workload, encoding asset, attribution | như cũ | như cũ |
-| Sidecar | `ILayerBoundaryRefiner` bằng SAM 2/3 + MatAnyone trong tiến trình Python | sau M3.5 | chỉ xây khi bucket "mép layer" ≥ 20% bytes hoặc verify fail tập trung ở biên layer trên 2D animation |
-
-### 12.2 M2.5: layer theo coherent change, contract và bản đồ vấn đề → cơ chế
-
-Contract provider (tất cả in-proc, .NET):
-
-```text
-LayerProposal   := { supportMask(t) (block-level, rồi pixel-level), Sim(2) track khởi tạo, zHint }
-ILayerProposer  := frames → LayerProposal[]          (Classical: block flow + sequential RANSAC + liên thông)
-ILayerBoundaryRefiner := (frames, supportMask(t)) → alpha(t) trong dải biên   (Classical: guided filter / trapped-ball; Sidecar: SAM+MatAnyone, sau)
-MotionLayerSetProvider : ICandidateProvider          (nhận proposal, dựng candidate T5, closed loop đo)
-```
-
-Mỗi vấn đề trong `aurbey-review.md` mục 2 và 5 đã có chỗ giải:
-
-| Vấn đề | Cơ chế | Ở bước |
-| --- | --- | --- |
-| Đếm và khởi tạo layer không cần người | matching pursuit: thêm layer khi lợi ích biên đo được lớn hơn chi phí biên (direction 5.7 tầng 1); K ≤ 4 | M2.5 |
-| Tương ứng điểm cho Sim(2) trên nội dung ít texture | hai đường: KLT trong support khi có texture; ECC/ảnh-trực-tiếp trên pixel khi không (khởi tạo bằng flow block + RANSAC) | M2 (K=1), M2.5 |
-| Mép layer, matte đổi theo frame | một alpha canonical cho cả run; sai số mép là error đo trên composite; vượt sàn thì crossfade hoặc patch, không phát asset mỗi frame | M2.5 |
-| Re-identification xuyên che khuất và scene | canonical hash theo pose chuẩn (direction 5.4); tracker không giữ ID | M2.5 |
-| z-order | đồ thị ràng buộc từ sự kiện occlusion + topological sort; chu trình = hạ giả thuyết (direction 6.2) | M2.5 |
-| Nền chưa từng lộ, nền parallax | lỗ để trong suốt, closed loop vá khi lộ; parallax = thêm layer hoặc rơi về T2 | M2.5 |
-| Drift chậm (freeze gate) | closed loop so với asset đang hiển thị, `ErrorMap` sau `AdvanceTo` | M1 |
-| Chi phí dự đoán sai | chi phí đo: bytes sau encode PNG, workload từ timeline; ràng buộc cứng không trọng số | M1, M3 |
-| Nền động, thrash | T2 có cap; `Animation` chỉ cho vùng nhỏ với cap resident bytes | M3 |
-| Glow, flash | additive layer: base = percentile thấp trong hệ sprite đã bù chuyển động, light = max delta, α(t) đóng dạng; gate clamp và SSIM | M2.5 |
-| Easing không "lossless" trên nội dung không author | fallback keyframe RDP khi không easing nào đạt epsilon screen-space | R2 |
-| Group transform của `AnimationVideo` | mọi track của layer đi qua baker theo single-writer (I5) | M2 |
-| Near-duplicate asset | vẫn REJECT; chỉ canonical exact hash | giữ nguyên |
 
 ---
 

@@ -19,26 +19,35 @@ pass straight through to output IR unchanged.
 
 ## Read this before designing anything
 
-`docs/implementation-plan.md` is the top source for what to build next (Phase A → M1, decisions D1 to D16,
-post-M1 order in §12.1); it overrides `docs/direction.md` where §3 says so. `docs/aurbey-review.md` is the
-review of the `aurbey.md` concept and records why its SAM-first and cost-weight parts were dropped (D12, D16).
+Three documents, each with one job:
 
-`docs/direction.md` is the single source for where this project is going: what is broken in the
-current implementation and why, what osu! storyboards can actually express, the representation
-space, the target architecture with its invariants, a step-by-step implementation roadmap
-(M0 through M3.5), open questions, and the full measurement history of everything already tried.
+- `docs/implementation-plan.md` says what to build: every settled decision (D1 to D16), the target
+  architecture and invariants (I1 to I15), each step from Phase A to M1 with API, tests and acceptance,
+  and the post-M1 order (R1 dataset, M2 global motion, R2 easing, M2.5 layer set, M3, M3.5, a gated
+  model sidecar). Start here.
+- `docs/direction.md` says why: what is broken in v1 and why, what osu! storyboards can actually
+  express, the representation space, the decomposition strategy, the decision table with the condition
+  that would reverse each rejection, prior art for every block of the pipeline, and the measurement
+  history of everything already tried.
+- `docs/feasibility-plan.md` is the throw-away verification protocol that runs before Phase A.
 
-Two things that document settles, and that cost real time to re-derive:
+Three things those documents settle, and that cost real time to re-derive:
 
 - The current output is blurry and heavy for structural reasons, not tuning reasons. The quality
   floor is relative (`ParameterTuner.cs`), palette quantization has no dithering (`AssetStore.cs`),
   the run tracker is open-loop so slow changes never close a run, and there is exactly one output
   primitive (a static crop plus one `S` command), so any camera motion re-emits the whole canvas
   every frame.
+- The target is a library that compiles one video; there is no CLI, no `.osbv`, no tuner and no
+  scene pre-pass in the new design. The unit of work is a coherent change, not a semantic object:
+  layers are proposed from motion and accepted only when the closed loop measures them cheaper.
+  Learned models (SAM, matting) are allowed only as an optional boundary refiner in a separate
+  process, behind a measured gate.
 - Several plausible directions are already ruled out with measurements, including motion/residual
-  compensation against a fixed grid, alpha-masked asset trimming, an RDO selection layer, and
-  heatmap-adaptive tile partitioning. Check section 11 (decision table) and section 13 (measurement
-  history) before proposing any of them again.
+  compensation against a fixed grid, alpha-masked asset trimming, an RDO or hand-weighted cost layer,
+  heatmap-adaptive tile partitioning, semantic tracking as the backbone, near-duplicate asset swaps
+  without pixel verification, and dynamic backgrounds as `Animation`. Check `direction.md` section 8
+  (decision table) and section 11 (measurement history) before proposing any of them again.
 
 ## Commands
 

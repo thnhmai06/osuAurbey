@@ -25,7 +25,7 @@ Metadata is from ffprobe (2026-09-29).
 | `hard/minecraft` | `hard/This is Minecraft.mp4` | 1920×804 | 24000/1001 | 103.5 s | 2481 |
 
 The rename in commit `f82dd56` shows how these relate to the names used in `docs/direction.md` (section
-13):
+11):
 
 | Old name | Current ID |
 | --- | --- |
