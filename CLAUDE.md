@@ -21,10 +21,10 @@ pass straight through to output IR unchanged.
 
 Three documents, each with one job:
 
-- `docs/implementation-plan.md` says what to build: every settled decision (D1 to D16), the target
+- `docs/implementation-plan.md` says what to build: every settled decision (D1 to D18), the target
   architecture and invariants (I1 to I15), each step from Phase A to M1 with API, tests and acceptance,
-  and the post-M1 order (R1 dataset, M2 global motion, R2 easing, M2.5 layer set, M3, M3.5, a gated
-  model sidecar). Start here.
+  and the post-M1 order (R1 dataset, M2 global motion, R2 easing, M2.5a causal rect layers, gated M2.5b
+  masks and background plate, M3, R3 solver oracle, M3.5, a gated model sidecar). Start here.
 - `docs/direction.md` says why: what is broken in v1 and why, what osu! storyboards can actually
   express, the representation space, the decomposition strategy, the decision table with the condition
   that would reverse each rejection, prior art for every block of the pipeline, and the measurement

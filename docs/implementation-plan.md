@@ -8,7 +8,7 @@ hướng.
 
 ## 0. Cách dùng tài liệu này
 
-**Thứ tự ưu tiên nguồn.** Tài liệu này là nguồn cho *xây gì*: mọi quyết định đã chốt (mục 2),
+**Thứ tự ưu tiên nguồn.** Tài liệu này là nguồn cho *xây gì*: mọi quyết định đã chốt (mục 2, D1 đến D18),
 kiến trúc và invariants (mục 4), từng bước từ Phase A tới M1 (mục 8) và lộ trình sau M1 (mục 12).
 `docs/direction.md` là nguồn cho *lý do*: chẩn đoán, sự thật về osu!, không gian representation, bảng
 bác bỏ (mục 8 của nó), prior art (mục 10) và lịch sử đo (mục 11). Hai tài liệu không override nhau:
@@ -90,11 +90,13 @@ tùy biến, lookahead.
 | D10 | Plan chi tiết cho phần trước mắt; phần chưa biết chỉ nêu concept và khả thi | Mục 8 chi tiết (Phase A, M0, M0.5, M1). Mục 12 là spec mức bước cho phần sau M1, chi tiết file và test viết khi tới lượt. |
 | D11 | Nhiều tiến trình OsbMpeg chạy song song trên cùng thư mục asset phải an toàn | Hợp đồng "tạo nếu chưa có" nguyên tử (mục 5.1). Ghi file tạm rồi rename, không bao giờ ghi đè. |
 | D12 | **Không có khái niệm object hay thực thể ngữ nghĩa.** Đơn vị làm việc là *thay đổi liên kết* (coherent change): vùng không-thời gian lớn nhất mà một primitive trong ladder giải thích được trong sàn. "Sprite" là hệ quả của việc một track Sim(2) giải thích được một vùng, không phải đầu vào. | Không có kênh prompt, không có bước "định danh object". Layer được *đề xuất* bằng tín hiệu motion (block flow, sequential RANSAC Sim(2), liên thông không gian, prior thời gian) và được *nhận* chỉ khi closed loop đo thấy rẻ hơn. Re-identification xuyên che khuất và xuyên scene là canonical hash của asset (I10), không phải ID của tracker. |
-| D13 | **Lõi là .NET thuần; model học chỉ ở sidecar tùy chọn.** SAM 2/3, MatAnyone hoặc tương đương chạy trong tiến trình Python riêng, chỉ để *tinh chỉnh biên* (alpha matte) của layer đã được đề xuất bằng motion. Không có sidecar thì pipeline vẫn chạy đầy đủ. | Contract `ILayerBoundaryRefiner` (mục 12.5, sidecar ở 12.9). Sidecar chỉ được xây sau khi attribution (M3.5) chỉ ra bucket "mép layer" đủ lớn. Không thêm ONNX hay PyTorch vào assembly `OsbMpeg`. |
+| D13 | **Lõi là .NET thuần; model học chỉ ở sidecar tùy chọn.** SAM 2/3, MatAnyone hoặc tương đương chạy trong tiến trình Python riêng, chỉ để *tinh chỉnh biên* (alpha matte) của layer đã được đề xuất bằng motion. Không có sidecar thì pipeline vẫn chạy đầy đủ. | Contract `ILayerBoundaryRefiner` (mục 12.6, sidecar ở 12.9). Sidecar chỉ được xây sau khi attribution (M3.5) chỉ ra bucket "mép layer" đủ lớn. Không thêm ONNX hay PyTorch vào assembly `OsbMpeg`. |
 | D14 | **Ưu tiên nội dung được author**: motion graphics, UI, 2D animation. Game và footage vẫn phải không tệ đi (verify pass, bytes không tăng), nhưng không là mục tiêu tối ưu trong 6 tháng tới. | Thêm tier fixture `authored` (mục 9.2 và `tests/fixtures/README.md`). R1 (dataset có ground truth chương trình) đi ngay sau M1, R2 (easing rời rạc) ngay sau M2, motion layer K>1 là M2.5 với keep-gate đo trên tier `authored` (mục 12.1). |
 | D15 | **Thứ tự: closed loop trước, provider sau.** Phase A → M0 → M0.5 → M1 giữ nguyên. Không spike SAM hay Sim(2) trên code v1. | Mọi số đo về layer, easing, additive đều phải là số đo *sau* verify. Spike về layer, Sim(2), easing và additive (mục 12.5, 12.6) chạy trên nền M1 và M2, không sớm hơn. |
-| D16 | **Các hướng đã bác bỏ có bằng chứng, không đề xuất lại** (bảng quyết định, `direction.md` mục 8): tracking ngữ nghĩa làm xương sống; freeze gate so với frame trước (vòng hở, chính là lỗi mờ của v1); nền động hay vùng lớn bằng `Animation` (R4); cubic Bézier và curve tham số tự do (không có trong `.osb`); dedupe theo pHash hay fuzzy không verify pixel (pop); cost function dự đoán với trọng số tay (đo thật thua 2,6 đến 5,4 lần); value-chaining và `[Variables]`. | Không viết code cho các mục này; muốn đảo thì phải có số đo nêu trong cột "điều gì đảo nó" của bảng đó. Những kỹ thuật được giữ cho M2.5: Sim(2) thay affine; `C` đóng dạng với master là frame sáng nhất; additive layer `Base + α(t)·Light` với base theo percentile, chỉ trong hệ sprite đã bù chuyển động; easing rời rạc + piecewise + chọn theo error + λ·complexity; canonical asset + instance; nền tĩnh median không ảo giác, lỗ để trong suốt cho closed loop vá. |
+| D16 | **Các hướng đã bác bỏ có bằng chứng, không đề xuất lại** (bảng quyết định, `direction.md` mục 8): tracking ngữ nghĩa làm xương sống; freeze gate so với frame trước (vòng hở, chính là lỗi mờ của v1); nền động hay vùng lớn bằng `Animation` (R4); cubic Bézier và curve tham số tự do (không có trong `.osb`); dedupe theo pHash hay fuzzy không verify pixel (pop); cost function dự đoán với trọng số tay (đo thật thua 2,6 đến 5,4 lần); value-chaining và `[Variables]`. | Không viết code cho các mục này; muốn đảo thì phải có số đo nêu trong cột "điều gì đảo nó" của bảng đó. Những kỹ thuật được giữ cho M2.5: Sim(2) thay affine; `C` đóng dạng với master là frame sáng nhất; additive layer `Base + α(t)·Light` với base theo percentile, chỉ trong hệ sprite đã bù chuyển động; easing rời rạc + piecewise + chọn theo error + λ·complexity; canonical asset + instance; nền dựng từ pixel thật đã thấy (tích lũy theo mask, không ảo giác), pixel chưa từng thấy được lấp bằng khuếch tán và không bao giờ được tin (mục 12.6). |
 
+| D17 | **Vật thể di chuyển làm lộ nền được xử lý theo hai nấc.** Nấc a (M2.5a): theo dõi vùng của X bằng quỹ đạo Sim(2), biểu diễn X bằng *một* sprite cắt theo bounding rect kèm track, chạy nhân quả; nền vừa lộ ra *không* được dựng riêng mà để closed loop vá bằng patch như mọi vùng bẩn khác, và patch đó được chèn **dưới** X. Nấc b (M2.5b): mask và alpha cho X, dựng nền nhìn trước cả đoạn, khử lem màu ở mép; chỉ xây khi số đo của nấc a cho thấy bucket `rect-halo` hoặc `reveal-strip` đủ lớn. | Không có pass tích lũy, không dựng nền, không alpha ở M2.5a. Cần ba thay đổi nền tảng ở M2 (S2.R, S2.G) và chèn-dưới trong `ReconstructionState`/`EmitContext` (S1.2). Gate theo đoạn bằng kiểm thử khô; bị từ chối thì output trùng byte với bước trước. |
+| D18 | **Solver (CP-SAT, ILP) là thước đo trước khi là công cụ.** Dùng làm oracle offline cho R3 để đo ladder greedy bỏ phí bao nhiêu; chỉ được vào lõi ở bài toán ngân sách workload M3 (multiple-choice knapsack theo lát thời gian) khi oracle hoặc số vi phạm ngân sách đòi. Không dùng làm bộ chọn representation toàn cục trong lúc encode. | `Google.OrTools` chỉ được thêm vào project đo hoặc test, không vào assembly `OsbMpeg` cho tới khi S3.1b được duyệt. Các bài toán con có cấu trúc tốt hơn giữ thuật toán chuyên dụng: chia đoạn easing dùng DP, z-order K ≤ 4 duyệt hết, gán block vào layer dùng graph cut nếu cần, span crossfade dùng greedy. |
 ---
 
 ## 3. Quan hệ với `docs/direction.md`
@@ -299,7 +301,10 @@ Mọi code, hiện tại và tương lai, phải giữ. Vi phạm là bug kiến
   được, sai thì không.
 - **I4.** Confidence và heuristic không bao giờ thay pixel check. Motion confidence, hash equality, RDP
   error, tracking score, mask của bất kỳ model nào chỉ dùng để *đề xuất* candidate. Mọi commit phải qua
-  pixel-level evaluate đạt sàn trước.
+  pixel-level evaluate đạt sàn trước. Candidate sống dài hơn `FrameWindow` (track của M2, layer của
+  M2.5) không thể được kiểm trên frame tương lai trước khi commit: với chúng, kiểm thử khô trên bản
+  downscale của cả đoạn thay cho kiểm trước commit, còn closed loop vẫn kiểm mọi frame full-res khi
+  frame tới và vá chỗ sai (S2.G). Không frame nào được ship mà chưa qua pixel check.
 - **I5.** Mỗi property có một người ghi duy nhất, và `PropertyOverlapValidator` gate mọi output. Property
   theo lazer, tính theo từng `SbCommandKind` sau khi IR đã tách `M` thành `MoveX`/`MoveY` và `V` thành
   `VectorScaleX`/`VectorScaleY`; `S` và `V` là hai property riêng, validator chỉ cảnh báo khi cả hai
@@ -1012,6 +1017,11 @@ internal sealed class ReconstructionState
 }
 ```
 
+- **`Order` cho phép chèn ở dưới.** `Order` là khóa sắp xếp có khoảng trống (ví dụ `long` cấp theo bước
+  lớn, chia đôi khi cần chèn), không phải chỉ số liên tiếp. M1 chỉ cấp tăng dần, nhưng API
+  `Add(item, below: DisplayItem?)` có từ đầu, vì M2.5a phải đặt patch vá nền dưới sprite của X (D17), và
+  sửa kiểu khóa sau khi đã có test tương đương là đắt. `EmitContext` xuất IR theo `Order`, nên chèn dưới
+  trong display list cũng là chèn dưới trong `.osb`.
 - **Công thức vẽ:** pixel = `src × tint / 255`, rồi `dst = dst·(1−a) + pixel·a`, làm tròn
   half-away-from-zero về byte. Item vẽ khi `StartMs ≤ t < EndMs`, theo `Order` tăng dần.
 - **`AdvanceTo(t)`:** tập "động" gồm item có track alpha hoặc tint đang nội suy tại t, hoặc tại thời
@@ -1331,9 +1341,11 @@ mục 8. Mọi số đo ghi vào mục 11 của `direction.md`; mọi A/B so v�
 | R1 | Dataset có ground truth chương trình, tier `authored`, metric tầng hai (12.2) | ngay sau M1 | là instrument, không gate; sai lệch tier rẻ so với render thật là phát hiện |
 | M2 | `TransformTrackProvider` K=1 cộng sub-segment theo motion (12.3) | sau R1 | acceptance trong 12.3 |
 | R2 | Easing rời rạc cộng piecewise trong `TrajectoryFitter` (12.4) | ngay sau M2 | ≥ 30% command bytes trên `authored`, 0 verify regression; trượt thì giữ RDP linear |
-| M2.5 | `MotionLayerSetProvider` K ≤ 4 theo coherent change (12.5, 12.6) | sau R2 | trên `authored`: bytes ≤ 0,5× M2 và sprite ≤ 0,2× M2, verify 100%; trên medium và hard: bytes không tăng quá 2%, verify 100%; trượt thì quay về DEFER tới M3.5 |
+| M2.5a | Layer nhân quả theo rect: X là một sprite di chuyển, nền lộ ra do closed loop vá và chèn dưới X (12.5) | sau R2 | trên `authored`: bytes ≤ 0,5× M2 và sprite ≤ 0,2× M2, verify 100%; trên medium và hard: bytes không tăng quá 2%, verify 100%; trượt thì quay về DEFER tới M3.5 |
+| M2.5b | Mask và alpha cho X, dựng nền nhìn trước, khử lem màu (12.6) | sau M2.5a, chỉ khi bucket `rect-halo` hoặc `reveal-strip` ≥ 20% bytes trên `authored` | bytes ≤ 0,7× M2.5a trên fixture kích hoạt nó, verify 100%, không fixture nào tệ đi |
 | M3 | Ngân sách workload, `Animation` có cap, encoding asset (12.7) | sau M2.5 (ngân sách và animation có thể sớm hơn nếu số của M1 đòi) | acceptance trong 12.7 |
-| M3.5 | Attribution và quy trình quyết định (12.8) | sau M3 | không phải feature |
+| R3 | Oracle ILP đo oracle gap của ladder (12.8) | sau M3 | là instrument; gap ≥ 10% thì đề xuất nâng bộ chọn, dưới 10% thì đóng câu hỏi ladder |
+| M3.5 | Attribution và quy trình quyết định (12.8) | sau M3 và R3 | không phải feature |
 | Sidecar | `ILayerBoundaryRefiner` bằng model matting trong tiến trình Python (12.9) | sau M3.5 | chỉ xây khi bucket `layer-edge` ≥ 20% bytes hoặc verify fail tập trung ở biên layer trên 2D animation |
 
 ### 12.2 R1: dataset ground truth, tier `authored`, metric tầng hai
@@ -1363,6 +1375,22 @@ Mục đích: hết nặng trên pan và zoom, vì nội dung do camera dịch c
 Phụ thuộc M1 và R1. Không làm: K lớn hơn 1 (M2.5), panorama (DEFER tới M3.5), camera rotation (bỏ ở bản
 này, thêm khi attribution đòi, `R` đã sẵn). Scene pre-pass không còn, nên M2 phải tự có segmenter (S2.3)
 và dùng quy tắc cut của `ClosedLoopEncoder` (S1.8) làm ranh giới cứng.
+
+**S2.R Mở rộng display model (MUST, làm đầu tiên).** `DisplayItem` của M1 là ảnh RGB24 căn pixel với
+alpha toàn cục; sprite di chuyển không đặt vào được. Thêm: pixel RGBA (alpha theo pixel, mặc định 255),
+track Sim(2) dạng đoạn tuyến tính `(x, y, s, θ)` quanh tâm, composite bilinear trên footprint đã
+transform. Tập "động" của `AdvanceTo` gồm cả item có transform đang nội suy; vùng composite lại là hợp
+footprint trước và sau. `BlockOwnership`: item có transform hoặc alpha theo pixel không bao giờ làm chủ
+block và không bao giờ bị đóng bởi quyền sở hữu; nó đóng ở cuối đoạn hoặc khi gate gỡ nó. Item tĩnh bị
+item di chuyển che một phần thì không bị đóng. Test: mở rộng test tương đương ngẫu nhiên của S1.2 với
+transform và alpha, so với renderer IR, sai tối đa ±1 mỗi kênh.
+
+**S2.G Quy tắc commit trước, vá sau (MUST).** Candidate sống dài hơn `FrameWindow` (I4) được commit ở đầu
+đoạn khi qua gate theo đoạn: pass A downscale render composite dự kiến cho mọi frame của đoạn và đo diện
+tích phần dư; nhận khi lợi ích ròng ước lượng dương và phần dư dưới ngưỡng (gate hai tầng của S2.2 là một
+trường hợp). Sau commit, closed loop kiểm full-res từng frame và vá như thường. Nếu bytes vá thực tế trong
+đoạn vượt bytes ước lượng của phương án không có candidate đó, ghi vào report để hiệu chỉnh gate; không
+quay lui trong đoạn.
 
 **S2.0 Spike ước lượng (MUST, trước khi xây phần còn lại).** Block matching chỉ translation trên
 `pan_synthetic` và fish_spinning 5 giây, đo inlier ratio và residual. Quyết: block matching đủ, hay
@@ -1434,15 +1462,17 @@ bắt được vi phạm theo từng chiều.
 
 **S2.6 Fixture (MUST).** Tier `authored` đã có từ R1; thêm hai fixture synthetic: `pan_synthetic` (ffmpeg zoompan trên ảnh tĩnh lớn) và
 `pan_foreground_synthetic` (pan cộng một sprite chuyển động độc lập chiếm khoảng 20% frame, thiết kế
-để vừa lọt gate 60/70), script tạo trong `tests/fixtures/make_synthetic.ps1` (S1.12).
+để vừa lọt gate 60/70), script tạo trong `tests/fixtures/make_synthetic.ps1` (S1.12). Thêm luôn
+`object_reveal_flat` và `object_reveal_textured` dùng cho M2.5: camera tĩnh, một vật X rộng khoảng 15%
+khung đi ngang qua nền phẳng hoặc nền có texture trong 3 giây, làm lộ dần phần nền bị che.
 
 Acceptance M2: (1) `pan_synthetic` asset bytes không quá 1/5 so với M1; (2) minecraft 10 giây không
 quá 60% bytes so với M1; (3) `pan_foreground_synthetic` cho thấy gate hai tầng từ chối hoặc nhận đúng
 theo net win, kiểm cả hai nhánh bằng cách chỉnh kích thước foreground; (4) 100% frame vẫn đạt sàn qua
 verify độc lập; (5) scene bị từ chối motion cho output trùng byte với M1.
 
-Thứ tự M2: S2.0 → S2.1 → S2.2 → S2.4 → S2.5 (nhánh không baker) → S2.3 → S2.5 (fold baker) → S2.6 →
-acceptance.
+Thứ tự M2: S2.R → S2.0 → S2.1 → S2.2 → S2.G → S2.4 → S2.5 (nhánh không baker) → S2.3 → S2.5 (fold
+baker) → S2.6 → acceptance.
 
 ### 12.4 R2: easing rời rạc trong `TrajectoryFitter`
 
@@ -1463,56 +1493,92 @@ Acceptance R2: trên `authored`, command bytes giảm ít nhất 30% so với M2
 case generator thuộc "từng họ easing", `representation_confusion` chỉ ra easing đúng ở ít nhất 90% case
 không mập mờ; trên medium và hard, output trùng byte với M2 hoặc nhỏ hơn.
 
-### 12.5 M2.5: layer set K ≤ 4 theo coherent change
+### 12.5 M2.5a: layer nhân quả theo rect
 
-Mục đích: nội dung được author (D14) là nhiều object độc lập di chuyển; K=1 không bắt được. Theo D12,
-không có bước định danh object: layer được *đề xuất* bằng motion và được *nhận* chỉ khi closed loop đo
-thấy rẻ hơn. Phụ thuộc M2 và R2.
+Mục đích: nội dung được author (D14) là nhiều vật độc lập di chuyển trên nền; K=1 không bắt được. Theo D12,
+không có bước định danh object: layer được *đề xuất* bằng motion và được *nhận* chỉ khi đo thấy rẻ hơn.
+Theo D17, nấc này không dựng nền và không có alpha. Phụ thuộc M2 (S2.R, S2.G) và R2.
 
-Contract, tất cả internal và in-proc:
+**Quan sát dẫn tới thiết kế.** Khi X rời một chỗ, vùng đó hiển thị sai so với nguồn, `ErrorMap` đánh dấu
+bẩn và `PatchProvider` cắt nó từ frame hiện tại. Nghĩa là "phục hồi nền phần vừa lộ" closed loop đã làm
+sẵn, đúng cả khi X đi nhanh, bị che hay đổi hình, mà không cần biết rect nào. Giá trị thật của việc theo
+dõi X là biểu diễn *chính X* bằng một sprite di chuyển thay vì patch lại X ở mỗi vị trí mới.
+
+Contract, internal và in-proc:
 
 ```text
-LayerProposal          := { supportMask(t) (block, rồi pixel), Sim(2) track khởi tạo, zHint }
-ILayerProposer         := frames → LayerProposal[]
-                          (Classical: block flow → sequential RANSAC Sim(2) K ≤ 4 → lọc liên thông
-                           không gian ≥ diện tích tối thiểu → prior thời gian từ frame trước)
-ILayerBoundaryRefiner  := (frames, supportMask(t)) → alpha(t) trong dải biên
-                          (Classical: guided filter, trapped-ball trên nội dung phẳng; Sidecar: 12.9)
-MotionLayerSetProvider : ICandidateProvider, rank 25 (giữa TransformTrack và Crossfade)
+LayerProposal          := { supportMask(t) mức block, Sim(2) track, footprint(t), zHint }
+ILayerProposer         := frames (downscale, pass A) → LayerProposal[]
+                          block flow → sequential RANSAC Sim(2), K ≤ 4 → lọc liên thông ≥ diện tích
+                          tối thiểu → prior thời gian từ frame trước (tracking mô hình chuyển động,
+                          không phải tracking object)
+MovingRectProvider     : ICandidateProvider, rank 25, propose ở đầu đoạn theo S2.G
 ```
 
-Các quyết định thiết kế, mỗi cái gắn với vấn đề nó giải:
+Candidate: sprite là ảnh cắt bounding rect của support tại frame chuẩn (frame trong đoạn có support lớn
+nhất và ít bị che nhất theo sự kiện occlusion), pixel đặc, track `MX`, `MY`, `S`, `R` từ quỹ đạo qua
+`TrajectoryFitter` và easing R2, ghép qua baker (I5). Chỉ cần rect của frame trước và frame hiện tại để
+dựng quỹ đạo; không lưu lịch sử rect, vì vùng lộ do `ErrorMap` tìm.
 
-| Vấn đề | Cơ chế |
+**Quy tắc z cho patch vá (điểm dễ sai nhất).** Trong `.osb` object khai báo sau nằm trên. Patch vá nền sinh
+sau sprite X, nếu đặt mặc định sẽ nằm trên X; khi X quay lại, patch che X, vùng X bẩn và patch chồng patch.
+Quy tắc: patch có rect *không giao* footprint của bất kỳ layer di chuyển nào trong khoảng sống của nó được
+chèn ngay dưới layer thấp nhất (`Add(item, below)` ở S1.2); patch giao footprint thì nằm trên như thường.
+
+| Vấn đề | Cách xử lý ở M2.5a |
 | --- | --- |
-| Đếm và khởi tạo layer không cần người | matching pursuit (`direction.md` 5.7 tầng 1): thêm layer khi lợi ích biên đo được trên bản downscale lớn hơn chi phí biên; K ≤ 4 |
-| Tương ứng điểm cho Sim(2) trên nội dung ít texture | hai backend từ S2.0: KLT trong support khi có texture, ECC trên pixel khi không |
-| Mép layer, matte đổi theo frame | một alpha canonical cho cả run; sai số mép là error đo trên composite; vượt sàn thì crossfade hoặc patch, không bao giờ phát asset mỗi frame cho mép |
-| Re-identification xuyên che khuất và scene | canonical asset theo pose chuẩn hóa (scale về bậc lượng tử, khử rotation) rồi exact hash (I10); tracker không giữ ID |
-| z-order | đồ thị ràng buộc từ sự kiện occlusion (layer nào thắng pixel nhìn thấy) cộng topological sort; chu trình là bằng chứng phân rã sai, hạ K |
-| Nền | layer có support lớn nhất; khi camera động thì tích lũy median trong hệ panorama (T6) với confidence mask; vùng chưa từng lộ để trong suốt, closed loop vá khi lộ |
-| Glow, flash | additive layer T9: trong hệ sprite đã bù chuyển động, `Base` = percentile thấp theo thời gian (không min, vì min bị nhiễu kéo xuống), `Light` = max delta, `α(t)` đóng dạng; gate clamp ≤ 2% và SSIM; emit 2 asset cộng `P,A` và track `F` |
-| Group transform của video | mọi track của layer compose qua baker theo single-writer (I5), cùng đường với `BakeTracked` của S2.5 |
-| Nền động vì nội dung (sóng, lá) | không phải layer; rơi về T2 cộng cap, và `Animation` chỉ cho vùng nhỏ (M3) |
-| Occlusion | hệ quả của z-order cộng closed loop (`direction.md` 5.3); chỉ thêm heuristic kéo dài lifetime layer bị che nếu dự đoán sẽ lộ lại |
+| Đếm layer không cần người | matching pursuit (`direction.md` 5.7 tầng 1), K ≤ 4 |
+| Di chuyển nhanh, rect cũ và mới không giao | không ảnh hưởng tới vùng lộ; chỉ cần flow bắt kịp (S2.0) |
+| Đổi kích thước, xoay | quỹ đạo Sim(2), phát `S` và `R` trên ảnh chuẩn; rect chỉ để chọn vùng cắt |
+| Biến dạng | phần dư trong footprint lớn, gate từ chối, rơi về crossfade hoặc patch |
+| Nền quanh X lọt vào rect | an toàn về chất lượng (verify bắt), lỗ về chi phí trên nền có texture; gate quyết định; đo bằng bucket `rect-halo` |
+| X bị Y che lúc cắt ảnh chuẩn, flow bị Y làm nhiễu | thành lỗi đo được, closed loop vá hoặc gate từ chối |
+| Patch vá dính mép X hoặc vệt mờ | nằm dưới X nên vô hại; lộ ra sau thì bị bắt và vá lại |
+| z giữa các layer | đồ thị ràng buộc từ sự kiện occlusion cộng duyệt hết thứ tự (K ≤ 4); mâu thuẫn thì giảm K |
+| X ra khỏi khung, X xuất hiện lại sau khi bị che hoàn toàn | đóng sprite; xuất hiện lại là layer mới, hash chuẩn hóa dùng lại asset nếu pixel trùng |
+| Group transform của video | ghép qua baker theo single-writer (I5) |
 
-Spike trước khi xây, mỗi cái có pass/fail chốt trước, trên `authored`, `fish-short` và `minecraft`
+Spike trước khi xây, pass/fail chốt trước, trên `authored`, `object_reveal_*`, `fish-short` và `minecraft`
 `standard`:
 
 | Spike | Câu hỏi | Pass |
 | --- | --- | --- |
-| A1 | Layer từ `ILayerProposer` classical có thắng K=1 trên cùng contract không | bytes ≤ 0,7× M2 và verify 100% trên ít nhất 2 trong 3 nhóm |
+| A1 | Layer rect từ `ILayerProposer` classical có thắng M2 cộng R2 không | bytes ≤ 0,7× và verify 100% trên ít nhất 2 trong 3 nhóm |
 | A2 | KLT trong support so với ECC trên pixel cho Sim(2) | residual screen-space dưới 0,5 px ở ≥ 90% frame trên `authored` |
-| A4 | Additive factor với base percentile trên glow thật | worst-tile SSIM ≥ sàn với 2 asset thay vì N patch trên ít nhất một fixture có flash |
 
-Acceptance M2.5: keep-gate ở 12.1; `pan_foreground_synthetic` (S2.6) được tách thành nền cộng một layer;
-case generator "layered motion kèm occlusion" cho `occlusion_consistency` ≥ 0,9; scene bị từ chối layer cho
-output trùng byte với M2 cộng R2.
+Acceptance M2.5a: keep-gate ở 12.1; `object_reveal_flat` cho đúng một asset X và không patch nào trong
+footprint của X; `object_reveal_textured` hoặc được nhận với bytes thấp hơn M2, hoặc bị gate từ chối với
+output trùng byte M2; case generator "layered motion kèm occlusion" cho `occlusion_consistency` ≥ 0,9;
+bucket `rect-halo` và `reveal-strip` được báo cáo cho mọi fixture.
 
-### 12.6 Spike và số đo của M2.5
+### 12.6 M2.5b: mask, alpha và dựng nền nhìn trước (có gate)
 
-Spike A1, A2, A4 ở 12.5 và S2.0 ở 12.3 là toàn bộ code ném đi được của giai đoạn này; deliverable là số
-trong mục 11 của `direction.md`. Spike A5 (chi phí GPU end-to-end của sidecar) chỉ chạy khi gate ở 12.9 mở.
+Chỉ xây khi M2.5a cho bucket `rect-halo` hoặc `reveal-strip` ≥ 20% bytes trên `authored`. Nấc a trả một
+patch hẹp cho mỗi dải nền lộ ra (ví dụ X rộng 200 px đi 5 px mỗi frame trong 60 frame: khoảng 60 patch,
+mỗi cái khoảng 1,5 KB overhead PNG, và số sprite sống tăng dần); nấc b đưa phần đó về một asset nền.
+
+Bước phân rã chạy mỗi đoạn, trước vòng encode:
+
+```text
+pass A, downscale  đề xuất layer, support mask và quỹ đạo như M2.5a
+pass A', full-res  tích lũy pixel trong hệ quy chiếu riêng của từng layer
+                   X: mẫu trong support của X; nền: mẫu ngoài mọi support foreground
+                   ước lượng bền vững: median khi đủ bộ nhớ, không thì trung bình có loại ngoại lai
+                   pixel chưa từng thấy: lấp bằng khuếch tán, confidence 0, không bao giờ được tin
+                   alpha từ biên (ILayerBoundaryRefiner classical: guided filter, trapped-ball)
+                   màu foreground F = (I − (1−α)·B)/α với B là nền đã dựng, kẹp khi α nhỏ
+kiểm thử khô       như S2.G, trên composite các layer cộng nền
+pass B, encode     đặt nền và layer vào display list ở đầu đoạn, closed loop vá phần dư
+```
+
+Dựng nền và dựng sprite X là cùng một phép toán: tích lũy trong hệ quy chiếu của một layer theo quỹ đạo và
+mask của chính nó; panorama khi camera động là trường hợp riêng. Lấp lỗ là bắt buộc chứ không phải tùy chọn:
+ở mép X alpha nhỏ hơn 1, nên lỗ trong suốt của nền sẽ lộ qua mép và vi phạm I14. Glow và flash dùng additive
+layer T9 trong cùng bước: trong hệ đã bù chuyển động, `Base` là percentile thấp theo thời gian, `Light` là max
+delta, `α(t)` đóng dạng, gate clamp ≤ 2% và SSIM. Chi phí thêm: một lần decode full-res mỗi đoạn có layer.
+
+Spike A4 (additive trên glow thật) và A5 (chi phí GPU của sidecar, chỉ khi gate 12.9 mở) thuộc nấc này.
+Acceptance M2.5b: keep-gate ở 12.1; trên `object_reveal_textured` bucket `reveal-strip` gần 0 và verify 100%.
 
 ### 12.7 M3: ngân sách, animation, encoding asset
 
@@ -1524,6 +1590,12 @@ sách ở `direction.md` 2.2. Không đạt thì encoder thử candidate hoặc 
 không hạ sàn (I6). PatchProvider bị ngân sách chặn về lý thuyết không xảy ra vì patch rời nhau về thời
 gian nên không tăng alive dài hạn; nếu vẫn xảy ra thì vẫn commit và ghi violation, vì fidelity thắng.
 Test: ngân sách giả nhỏ làm crossfade bị chặn và rơi về patch, bản ghi violation đúng.
+
+**S3.1b Giải ngân sách bằng solver (INVESTIGATE, theo D18).** Khi một đoạn vượt ngân sách, chọn đổi
+representation ở vùng nào là multiple-choice knapsack với ràng buộc dung lượng theo từng lát thời gian:
+biến `x[r,k]` chọn candidate k cho vùng r trong số candidate *đã đo*, `Σk x[r,k] = 1`, tối thiểu tổng bytes,
+với mọi lát t: `AliveSprites(t) ≤ 500`, `SbLoad(t) ≤ 4.0`, resident ≤ trần. Chỉ giải trên đoạn vượt nên tập
+nhỏ. Chỉ xây khi S3.1 greedy để lại vi phạm hoặc R3 cho thấy greedy ở đoạn vượt bỏ phí từ 10%.
 
 **S3.2 AnimationProvider và ThrashPlanner (MUST).** Pass hậu kỳ mỗi scene, không nằm trong vòng lặp
 mỗi frame. Quét lịch sử commit theo vùng: vùng có ít nhất 4 hard swap liên tiếp cách nhau đúng một
@@ -1567,7 +1639,9 @@ của encoder (flow, model, commit log, serialize ra `attribution.json` khi `Com
 | `deformation` | patch còn lại có SSIM giữa hai lần refresh liên tiếp cùng vùng ít nhất 0,7, tức đổi có cấu trúc |
 | `noise` | phần còn lại (SSIM giữa hai lần refresh dưới 0,7), bucket không cứu được |
 
-Thêm bucket `layer-edge`: bytes của patch nằm trong dải biên (dưới 8px) của một layer đã nhận ở M2.5. Output
+Thêm ba bucket cho layer: `rect-halo` (bytes patch nằm trong footprint của một layer rect đã nhận ở M2.5a, tức
+nền bị kéo theo trong rect), `reveal-strip` (bytes patch chèn dưới layer để vá nền vừa lộ), và `layer-edge`
+(bytes patch trong dải biên dưới 8px của layer có alpha ở M2.5b). Output
 là bảng phần trăm bytes theo bucket, theo từng fixture và trên toàn corpus, ghi vào mục 11 của `direction.md`.
 
 **S3.5.2 Quy trình quyết định (MUST, đây là quy trình chứ không phải code).** Bucket lớn nhất từ
@@ -1577,6 +1651,22 @@ từ 20% (mục 12.9). Bucket `noise` trội
 thì dừng, ship, và ghi giới hạn vào README. Không đặt tên M4 hay M5 trước; milestone sau M3.5 chỉ tồn
 tại sau khi attribution và benchmark của prototype thắng.
 
+**R3 Oracle ILP (instrument, theo D18).** Trong project đo, trên cửa sổ ngắn của tier `authored` và clip
+`standard`: chế độ exhaustive sinh mọi candidate, encode và kiểm pixel từng cái, rồi giải bài toán phủ có
+trọng số bằng CP-SAT:
+
+```text
+ô    = (block, frame) vi phạm;  x_c ∈ {0,1} cho mỗi candidate c đã đo là đạt sàn
+min  Σ bytes_c · x_c
+s.t. mỗi ô được phủ ít nhất một lần; candidate đã chọn không chồng nhau trong cùng ô
+     AliveSprites(t) ≤ 500, SbLoad(t) ≤ 4.0  với mọi t
+```
+
+So nghiệm với lựa chọn của ladder ra oracle gap. Ràng buộc không chồng nhau bỏ sót tổ hợp chồng hợp lệ như
+crossfade lồng transform, nên kết quả là cận dưới của gap; báo cáo kèm ghi chú này. Gap dưới 10% thì đóng
+câu hỏi ladder và dòng bác bỏ tối ưu toàn cục giữ nguyên bằng số; từ 10% trở lên thì đề xuất best-among-passing
+và mở S3.1b.
+
 Metric tầng hai của R1 (`representation_confusion`, `missing_primitive_attribution`) và oracle gap của R3
 cũng đổ vào checkpoint này bên cạnh các bucket trên.
 
@@ -1584,8 +1674,8 @@ cũng đổ vào checkpoint này bên cạnh các bucket trên.
 
 ### 12.9 Sidecar `ILayerBoundaryRefiner` (có gate)
 
-Chỉ xây khi M3.5 cho bucket `layer-edge` ≥ 20% bytes hoặc verify fail tập trung ở biên layer trên 2D
-animation. Tiến trình Python riêng (`tools/aurbey-sidecar`), vào là thư mục frame cộng support mask theo
+Chỉ xây sau M2.5b, khi M3.5 cho bucket `layer-edge` ≥ 20% bytes hoặc verify fail tập trung ở biên layer
+trên 2D animation. Tiến trình Python riêng (`tools/aurbey-sidecar`), vào là thư mục frame cộng support mask theo
 thời gian, ra là alpha 8-bit trong dải biên theo thời gian; lõi .NET đọc file và coi kết quả là *đề
 xuất* (I4), vẫn verify. Model chọn tại thời điểm gate mở (MatAnyone, SAM 2 hoặc SAM 3 cộng matting, hay
 thứ kế tiếp): contract không nêu tên model. Không có GPU hay không có sidecar thì pipeline chạy classical
@@ -1596,7 +1686,6 @@ A100 cho SAM 2, chậm 3 đến 10 lần trên GPU tiêu dùng; A5 đo thật tr
 
 | Hướng | Ý tưởng | Khả thi | Điều kiện để bắt đầu |
 | --- | --- | --- | --- |
-| **R3 oracle gap** | Chế độ đo mỗi region đánh giá mọi provider không dừng sớm, log (ladder chọn gì, rẻ nhất là gì, chênh bao nhiêu). | Khả thi, là instrument. | Sau M3; gap ≥ 10% thì nâng bộ chọn thành best-among-passing. |
 | **R4 loop synthesis** | Autocorrelation ra `L` hoặc `Animation` LoopForever. | Khả thi. | R1 hoặc attribution thấy chu kỳ phổ biến. |
 | **Panorama T6 cho pan dài** | Strip ≤ 1024 chung một trajectory (`direction.md` 5.5). | Khả thi. | Bucket `pan-reveal` ≥ 25% ở M3.5. |
 | **Perspective strips** | Chia strip, mỗi strip một similarity. | Khả thi. | Bucket `perspective-residual` ≥ 25%. |

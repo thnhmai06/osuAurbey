@@ -7,7 +7,7 @@ lịch sử đo đạc. Nó không chứa bước triển khai. Ba tài liệu c
 | Tài liệu | Trả lời câu hỏi | Khi mâu thuẫn |
 | --- | --- | --- |
 | `docs/direction.md` (file này) | vì sao, sự thật về osu!, không gian lựa chọn, đã đo được gì | sự thật và số đo ở đây là nguồn |
-| `docs/implementation-plan.md` | xây gì, theo thứ tự nào, với API và acceptance nào; mọi quyết định đã chốt (D1 đến D16), invariants, lộ trình từ Phase A tới M3.5 | quyết định thi công ở đó là nguồn; nếu nó đòi một sự thật khác với file này thì sửa file này, không override |
+| `docs/implementation-plan.md` | xây gì, theo thứ tự nào, với API và acceptance nào; mọi quyết định đã chốt (D1 đến D18), invariants, lộ trình từ Phase A tới M3.5 | quyết định thi công ở đó là nguồn; nếu nó đòi một sự thật khác với file này thì sửa file này, không override |
 | `docs/feasibility-plan.md` | kiểm chứng gì trước khi viết code sản phẩm (spike ném đi, tiêu chí pass/fail chốt trước) | |
 
 Người triển khai đọc `implementation-plan.md` trước, quay lại đây khi cần lý do. Gặp điểm tài liệu không
@@ -354,8 +354,8 @@ breakpoint đồng bộ. Strip ngoài màn bị GPU clip nên fill gần 0, ch�
 tùy ý chỉ là thêm strip, không chạm `MaxTextureSize`.
 
 Stitch bằng cách warp các frame về hệ panorama qua chính global transform đã có, tích lũy median theo
-từng pixel để loại mover, kèm confidence mask. Pixel chưa từng thấy để trong suốt và closed loop sẽ
-patch khi nó lộ. Asset bytes xấp xỉ hợp nội dung, tức cận dưới lý thuyết của mọi cách encode pan.
+từng pixel để loại mover, kèm confidence mask. Pixel chưa từng thấy được lấp bằng khuếch tán, confidence 0, không bao giờ được tin; closed loop sẽ patch khi
+nó lộ. Không để trong suốt, vì ở mép alpha mềm của layer phía trên lỗ sẽ lộ ra và vi phạm yêu cầu phủ kín. Asset bytes xấp xỉ hợp nội dung, tức cận dưới lý thuyết của mọi cách encode pan.
 Điều kiện nhận: scene đã accept K=1 và residual thấp, nghĩa là nền thực sự rigid.
 
 ### 5.6 Vì sao không dùng semantic detection và learned model
@@ -408,6 +408,41 @@ nhìn thấy giá thật của mình ngay. Còn mọi phương pháp toàn cục
 Closed loop trong bức tranh này là cơ chế đúng đắn và là máy đo chi phí thật cho mọi tầng trên. Trí
 tuệ nằm ở bốn tầng; closed loop bảo đảm mọi trí tuệ đó không thể sai thành artifact, chỉ có thể sai
 thành tốn.
+
+
+### 5.8 Vật thể di chuyển làm lộ nền: vì sao bắt đầu từ rect nhân quả
+
+Ca điển hình: X đứng trước nền, che một phần, rồi đi chỗ khác làm lộ dần phần nền bị che. Trực giác gợi ý
+phải tách X thành sprite RGBA rồi dựng lại nền. Nhưng phần "phục hồi nền vừa lộ" closed loop đã làm sẵn: vùng
+X vừa rời hiển thị sai, bị đánh dấu bẩn và được patch cắt từ frame hiện tại, đúng cả khi X đi nhanh, bị che
+hay đổi hình. Thứ closed loop *không* tự có là biểu diễn chính X bằng một sprite di chuyển.
+
+| Cách | Asset cho X rộng 200 px đi 5 px mỗi frame trong 60 frame | Cần thêm gì |
+| --- | --- | --- |
+| Chỉ patch (M1) | khoảng 60 patch cỡ X cộng dải lộ | không |
+| Rect nhân quả (M2.5a) | 1 sprite X cộng khoảng 60 patch dải hẹp | quỹ đạo Sim(2), display model có transform, chèn patch dưới X |
+| Phân rã có dựng nền (M2.5b) | 1 nền cộng 1 X | pass full-res tích lũy, mask và alpha, khử lem màu |
+
+Rect nhân quả lấy được phần lớn khoản tiết kiệm so với M1 với một phần nhỏ độ phức tạp. Phần còn lại, chuỗi
+dải lộ và quầng nền bị kéo theo trong rect khi nền có texture, được đo bằng hai bucket `rect-halo` và
+`reveal-strip`, và chỉ khi chúng lớn mới xây nấc b (I9). Rect không mask an toàn về chất lượng, vì phần nền
+sai trong rect bị verify bắt; nó chỉ có thể lỗ về chi phí, và gate theo đoạn chặn điều đó.
+
+Điểm dễ sai nhất là z-order: patch vá nền sinh sau sprite X nên mặc định nằm trên X; khi X quay lại, patch che
+X và sinh vòng patch chồng patch. Patch vá nền phải được chèn dưới layer di chuyển, nên display model phải
+cho phép chèn ở dưới ngay từ M1.
+
+### 5.9 Solver CP, ILP, SAT: thước đo trước khi là công cụ
+
+Chọn representation bằng solver toàn cục trong lúc encode không đáng làm lúc này, vì bốn lý do: chi phí chỉ
+biết sau khi encode PNG, nên đưa vào solver nghĩa là trả trước chi phí mà ladder dừng sớm để tránh; fidelity
+không cộng được khi candidate chồng nhau qua alpha, z-order và crossfade; quy mô hàng triệu biến buộc chia cửa
+sổ, khi đó thành greedy có lookahead; và bài học dự đoán thua đo thật ở 11.4. Hai chỗ solver hợp: oracle
+offline cho R3, giải bài toán phủ có trọng số trên candidate đã đo để biết ladder bỏ phí bao nhiêu, chính là
+điều kiện đảo của dòng bác bỏ tối ưu toàn cục; và ngân sách workload ở M3, nơi ràng buộc là vách đá theo từng
+lát thời gian và candidate đã được đo xong. Các bài toán con khác có thuật toán chuyên dụng tốt hơn: chia đoạn
+easing là DP một chiều, z-order với K ≤ 4 duyệt hết 24 thứ tự, gán block vào layer là gán nhãn MRF bằng graph
+cut, span crossfade đơn điệu nên greedy tối ưu.
 
 ---
 
@@ -588,7 +623,8 @@ Mỗi dòng một hướng, kèm điều kiện đảo quyết định. Không h
 | Photometric (T8) | fade và tint là command native, gần 0 bytes | fade gần như miễn phí | thấp | native (`F`, `C`) | MUST (M1) | không |
 | Global motion K=1 (T4) | R1 nội suy liên tục; 79 nghìn sprite là bằng chứng thiếu nó | thắng lớn nhất trên pan và zoom | trung bình | native (`M`, `S`) | MUST (M2), spike flow trước | S2.0 cho thấy flow không dùng được trên corpus thì thu hẹp về nội dung synthetic và game |
 | Sub-segment theo motion | scene tĩnh rồi pan rồi tĩnh là ca thường | mỗi segment một representation đúng | thấp | không đổi | MUST (M2) | không |
-| Layered motion K > 1 (T5) | lý thuyết vững; nội dung được author là nhiều object độc lập (D14); chưa đo tỷ trọng trên corpus game và footage | lớn trên `authored`, chưa rõ trên phần còn lại | trung bình tới cao (mép layer, alpha matte) | tốt (K sprite xếp z) | MUST (M2.5, sau R2) với keep-gate: trên `authored` bytes ≤ 0,5× và sprite ≤ 0,2× so với M2, verify 100%; trên medium và hard bytes không tăng quá 2% | trượt gate thì quay về DEFER tới M3.5 |
+| Layered motion K > 1, nấc rect nhân quả (T5, M2.5a) | nội dung được author là nhiều vật độc lập (D14); closed loop đã tự vá nền vừa lộ (5.8) | lớn trên `authored`, chưa rõ trên phần còn lại | trung bình | tốt (K sprite xếp z, patch vá chèn dưới) | MUST (M2.5a, sau R2) với keep-gate: trên `authored` bytes ≤ 0,5× và sprite ≤ 0,2× so với M2, verify 100%; trên medium và hard bytes không tăng quá 2% | trượt gate thì quay về DEFER tới M3.5 |
+| Mask, alpha, dựng nền nhìn trước, khử lem màu cho layer (M2.5b) | chỉ xóa được phần dải lộ và quầng nền mà nấc a để lại (5.8) | bằng tổng hai bucket `rect-halo` và `reveal-strip` | cao, thêm một pass full-res | tốt (T12) | DEFER tới sau M2.5a | `rect-halo` hoặc `reveal-strip` ≥ 20% bytes trên `authored` |
 | Panorama (T6) | toán khả thi (5.5); strip giải được giới hạn texture | cận dưới bytes cho pan dài | trung bình | tốt | DEFER tới M3.5 | bucket `pan-reveal` từ 25 tới 30% |
 | Tái dùng asset chuẩn hóa | hash đã có; chuẩn hóa là mở rộng key (I10) | lớn nếu bucket near-dup lớn | thấp tới trung bình | hoàn hảo | DEFER tới M3.5 | bucket `near-duplicate-assets` từ khoảng 20% |
 | Perspective strips | similarity thiếu shear, sai hệ thống và đo được | vừa, tùy nội dung | trung bình | chấp nhận được | DEFER tới M3.5 | bucket `perspective-residual` từ 25% |
@@ -597,7 +633,7 @@ Mỗi dòng một hướng, kèm điều kiện đảo quyết định. Không h
 | Model học tinh chỉnh biên layer (`ILayerBoundaryRefiner`: SAM, MatAnyone) | biên là chỗ duy nhất model học hơn classical | nhỏ trên `authored`, vừa trên footage | trung bình, nằm ngoài assembly (sidecar Python) | tốt, chỉ đổi alpha ở dải biên | DEFER tới sau M3.5 (D13) | bucket "mép layer" ≥ 20% bytes, hoặc verify fail tập trung ở biên layer trên 2D animation |
 | Depth estimation model | z-order suy được từ dữ liệu occlusion (6.2) | thấp | cao | gián tiếp | REJECT | layered motion bế tắc riêng vì không suy được thứ tự z |
 | Learned optical flow | classical khớp đúng granularity rect (5.6) | chỉ khi classical fail | cao (ONNX, model, GPU) | không đổi | REJECT ở giai đoạn này | S2.0 và cả DIS flow đều fail trên một bucket lớn |
-| RDO Lagrangian, graph search toàn cục | fidelity là ràng buộc cứng chứ không phải λ; bài học predict so với measure (11.4) | thấp | cao | không đổi | REJECT | đo được greedy ladder bỏ phí hơn 10 tới 15% trên corpus |
+| RDO Lagrangian, graph search hay solver toàn cục làm bộ chọn trong lúc encode | fidelity là ràng buộc cứng chứ không phải λ; bài học predict so với measure (11.4) | thấp | cao | không đổi | REJECT | đo được greedy ladder bỏ phí hơn 10 tới 15% trên corpus |
 | DP đặt keyframe | RDP đủ theo mọi số đo hiện có | nhỏ | thấp | không đổi | DEFER | đo thấy RDP bỏ phí keyframe đáng kể |
 | Fuzzy, pHash Hamming hay embedding cho near-dup, thay asset không verify pixel | O(N²) và rủi ro sàn; hai asset gần giống thay nhau giữa hai run kề sinh pop; canonical exact phủ phần lớn (5.4) | nhỏ so với canonical | cao | không đổi | REJECT | canonical reuse đã ship mà bucket near-dup vẫn lớn, và chỉ khi có verify SSIM so với sàn |
 | Animation fallback (T7) | thrash có thật (bad_apple); R4 giới hạn memory | chặn nổ sprite count | thấp | native, đắt memory | MUST (M3), có cap | không |
@@ -606,6 +642,8 @@ Mỗi dòng một hướng, kèm điều kiện đảo quyết định. Không h
 | Fit easing rời rạc trong TrajectoryFitter | lý thuyết vững, fit dạng đóng nên rẻ (6.3); nội dung ưu tiên được author bằng tween (D14) | lớn trên nội dung được author, gần 0 trên trajectory nhiễu | thấp | native (35 easing cố định, không tham số tự do) | MUST (R2, ngay sau M2) | keep-gate: ≥ 30% command bytes trên `authored`, 0 verify regression; trượt thì giữ RDP linear |
 | Cubic Bézier, spring, curve tham số tự do trong track | `.osb` chỉ có 35 easing cố định; Bézier chỉ xấp xỉ được bằng chuỗi segment | âm (không phát được) | không đổi | không có | REJECT | osu! thêm easing tham số |
 | Dataset ground truth và metric tầng hai | generator và renderer đã có; Crello Animation và Animation2Code có ground truth sẵn; mở khóa câu hỏi "chọn sai ở đâu" | là hạ tầng đánh giá | trung bình | là instrument | MUST (R1, ngay sau M1) | không cần gate; sai lệch tier rẻ so với tier vàng tự nó là phát hiện |
+| Solver CP-SAT/ILP làm oracle offline (R3) | là cách duy nhất có nghiệm tối ưu để so; chạy trên candidate đã đo nên không dự đoán (5.9) | biết chắc greedy bỏ phí bao nhiêu | trung bình, nằm ngoài assembly | không đổi | MUST (R3, sau M3) | không cần gate, là instrument |
+| Solver cho ngân sách workload (S3.1b) | ràng buộc theo lát thời gian liên kết nhau, greedy có thể vừa vi phạm vừa tốn (5.9) | vừa, chỉ trên đoạn vượt | trung bình | không đổi | INVESTIGATE (M3) | S3.1 greedy để lại vi phạm, hoặc R3 thấy gap ≥ 10% ở đoạn vượt |
 | Bộ chọn best-among-passing | bậc chi phí cách nhau bậc độ lớn nên nghi ngờ gap nhỏ; chưa đo | nhỏ tới vừa | thấp | không đổi | DEFER tới R3 | gap từ 10% trên dataset và fixture |
 | Synthesis nhận biết loop | `.osb` bytes là trục lợi duy nhất; LoopExtractor hậu kỳ đã có | nhỏ trừ khi nội dung có chu kỳ | trung bình | native (`L`) | DEFER (R4, `implementation-plan.md` mục 12) | R1 hoặc attribution thấy chu kỳ phổ biến |
 | Prune nhiều độ phân giải trong Evaluate | chỉ loại chứ không nhận nên an toàn với I4 | chỉ về hiệu năng | thấp | không đổi | DEFER | profile cho thấy evaluate là nút cổ chai |
