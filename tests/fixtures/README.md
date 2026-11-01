@@ -1,8 +1,8 @@
 # Test fixtures
 
 This file is the single source of truth for the test and benchmark videos: which fixtures exist, which
-profile each one is run at, and how the derived clips are generated. `docs/feasibility-plan.md` and
-`docs/implementation-plan.md` both refer to it and do not repeat it.
+profile each one is run at, and how the derived clips are generated. `docs/pipeline.md` refers to it and
+does not repeat it.
 
 Every video is stored through Git LFS (`*.mp4` and `*.gif`, see `.gitattributes`).
 
@@ -24,8 +24,8 @@ Metadata is from ffprobe (2026-09-29).
 | `hard/rollback` | `hard/rollback.mp4` | 1920×1080 | 24 | 155.1 s | 3720 |
 | `hard/minecraft` | `hard/This is Minecraft.mp4` | 1920×804 | 24000/1001 | 103.5 s | 2481 |
 
-The rename in commit `f82dd56` shows how these relate to the names used in `docs/direction.md` (section
-11):
+The rename in commit `f82dd56` shows how these relate to the names used in the v1 measurement history
+(`docs/pipeline.md` section 17):
 
 | Old name | Current ID |
 | --- | --- |
@@ -52,7 +52,7 @@ The easy videos are already small, so they run at native settings.
 | --- | --- | --- | --- | --- | --- |
 | `native` | easy | whole video | native | native | every test and benchmark on easy |
 | `quick` | medium, hard | 3 s | 360 (width `-2`, i.e. aspect-preserving and even) | `min(source, 24)` | fixture tests during the development loop |
-| `standard` | medium, hard | 10 s | 720 (width `-2`) | `min(source, 30)` | feasibility measurements, milestone acceptance, M0.5 calibration |
+| `standard` | medium, hard | 10 s | 720 (width `-2`) | `min(source, 30)` | capability acceptance (`docs/pipeline.md` §12), M0.5 calibration |
 | `full` | medium, hard | whole video | native | native | **only when the user explicitly asks**, e.g. checking a performance projection |
 
 A profile never scales **up**. If the source height is at or below the target height, it keeps the
@@ -86,9 +86,9 @@ ffmpeg -y -ss <From> -i "<source>" -t <length> -an \
 
 - Put `fps` before `scale`, so dropped frames are never scaled. Drop whichever filter is not needed
   (see the no-upscale and no-cap rules above).
-- `R` is the `round` value chosen by the feasibility work V10b, which gives the "a dropped frame is
-  represented by the frame before it" semantics. Until V10b has run, use `near` and write that into the
-  manifest.
+- `R` is the `round` value chosen by the fps-semantics test (`docs/pipeline.md` §9.2), which gives the "a
+  dropped frame is represented by the frame before it" semantics. Until that test has run, use `near` and
+  write that into the manifest.
 - `flags=area` avoids aliasing when downscaling.
 - CRF 10 is effectively transparent. It does not need to be mathematically lossless, because every method
   reads the same clip.
@@ -107,12 +107,12 @@ support the environment variable `OSBMPEG_FFMPEG_DIR` to point at that folder.
 ## Planned tier: `authored` (decision D14, 2026-10-29)
 
 Motion graphics, UI and 2D animation are the priority content and none of the tiers above contain any.
-The `authored` tier is built right after M1 (step R1 in `docs/implementation-plan.md` §12.1). It has
+The `authored` tier is built right after M1 (capability `DS` in `docs/pipeline.md` §12). It has
 three sources, none of which is committed as video:
 
 | Source | Ground truth | How it gets here | License note |
 | --- | --- | --- | --- |
-| Storyboard generator (`tools/OsbMpeg.DatasetGen`) | full program (`.osb` + assets), per `docs/direction.md` §6.5 | generated with a seed, rendered by `SoftwareStoryboardRenderer`, encoded with ffmpeg x264 CRF 16 | ours |
+| Storyboard generator (`tools/OsbMpeg.DatasetGen`) | full program (`.osb` + assets), per `docs/pipeline.md` §5.5 | generated with a seed, rendered by `SoftwareStoryboardRenderer`, encoded with ffmpeg x264 CRF 16 | ours |
 | Crello Animation (`cyberagent/crello-animation` on Hugging Face) | per-sprite static texture, per-frame affine matrix and opacity; 50 frames at 10 fps, 2 to 6 layers, 299 templates | download script renders each template to `.mp4` into the fixture cache | CDLA-Permissive-2.0 for the dataset, and the user must accept the VistaCreate license; original files are not redistributed, so do not commit renders |
 | Animation2Code (`anim2code/dataset` on Hugging Face) | HTML/CSS/JS that produced the video | download script, videos rendered deterministically by their environment | check the dataset card license before use; do not commit |
 

@@ -19,19 +19,15 @@ pass straight through to output IR unchanged.
 
 ## Read this before designing anything
 
-Three documents, each with one job:
+`docs/pipeline.md` is the single design document. It explains the whole pipeline: the product and its
+goals, what osu! storyboards can express, the representation space and strategy, every settled decision
+(D1 to D19) and invariant (I1 to I17), the architecture and public API, each step of one compile in time
+order, moving objects and backgrounds, how things are measured, the capability ladder with acceptance
+conditions, rejected directions with the condition that would reverse each one, prior art, lessons paid
+for by v1, and which v1 components are reused. It contains no implementation steps: the implementation
+plan is generated from it. The v1 code is only a parts bin, never a baseline to compare against.
 
-- `docs/implementation-plan.md` says what to build: every settled decision (D1 to D19), the target
-  architecture and invariants (I1 to I15), each step from Phase A to M1 with API, tests and acceptance,
-  and the post-M1 order (R1 dataset, M2 global motion, R2 easing, M2.5a causal rect layers, gated M2.5b
-  masks and background plate, M3, R3 solver oracle, M3.5, a gated model sidecar). Start here.
-- `docs/direction.md` says why: what is broken in v1 and why, what osu! storyboards can actually
-  express, the representation space, the decomposition strategy, the decision table with the condition
-  that would reverse each rejection, prior art for every block of the pipeline, and the measurement
-  history of everything already tried.
-- `docs/feasibility-plan.md` is the throw-away verification protocol that runs before Phase A.
-
-Three things those documents settle, and that cost real time to re-derive:
+Three things that document settles, and that cost real time to re-derive:
 
 - The current output is blurry and heavy for structural reasons, not tuning reasons. The quality
   floor is relative (`ParameterTuner.cs`), palette quantization has no dithering (`AssetStore.cs`),
@@ -49,8 +45,8 @@ Three things those documents settle, and that cost real time to re-derive:
 - Several plausible directions are already ruled out with measurements, including motion/residual
   compensation against a fixed grid, alpha-masked asset trimming, an RDO or hand-weighted cost layer,
   heatmap-adaptive tile partitioning, semantic tracking as the backbone, near-duplicate asset swaps
-  without pixel verification, and dynamic backgrounds as `Animation`. Check `direction.md` section 8
-  (decision table) and section 11 (measurement history) before proposing any of them again.
+  without pixel verification, and dynamic backgrounds as `Animation`. Check `docs/pipeline.md` section 14
+  (decision table) and section 17 (lessons from v1) before proposing any of them again.
 
 ## Commands
 
@@ -112,7 +108,7 @@ orchestrator, where a folder is a system boundary:
   eval sample so a candidate that overfits the train clip gets rejected. A scene no longer than
   `RequiredSampleMs` skips the eval split and tunes against its own full span, since that scene is
   the deliverable rather than a sample of something bigger (see `BuildSampleWindows`). Runs lazily,
-  only for a scene `VideoCompiler` is actually about to encode. Note that `docs/direction.md`
+  only for a scene `VideoCompiler` is actually about to encode. Note that `docs/pipeline.md`
   retires this whole system: the relative floor it optimizes toward is the root cause of the blur.
 - `Encode/` has `TileEncodeLoop`, the shared decode, track, merge, detect, emit loop used by both the
   `.osbv` per-`AnimationVideo` path and the legacy whole-canvas `EncodePipeline` and `bench` path.
