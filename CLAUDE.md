@@ -21,7 +21,7 @@ pass straight through to output IR unchanged.
 
 `docs/pipeline.md` is the single design document. It explains the whole pipeline: the product and its
 goals, what osu! storyboards can express, the representation space and strategy, every settled decision
-(D1 to D19) and invariant (I1 to I17), the architecture and public API, each step of one compile in time
+(D1 to D19) and invariant (I1 to I18), the architecture and public API, each step of one compile in time
 order, moving objects and backgrounds, how things are measured, the capability ladder with acceptance
 conditions, rejected directions with the condition that would reverse each one, prior art, lessons paid
 for by v1, and which v1 components are reused. It contains no implementation steps: the implementation
@@ -34,8 +34,8 @@ Three things that document settles, and that cost real time to re-derive:
   the run tracker is open-loop so slow changes never close a run, and there is exactly one output
   primitive (a static crop plus one `S` command), so any camera motion re-emits the whole canvas
   every frame.
-- The target is a library that extracts one video into OsuParsers objects, returned as an async event
-  stream with an explicit `Layer` and `Order` per object, with assets written to a caller-given storage.
+- The target is a library that extracts one video into OsuParsers objects, written into caller-supplied
+  channels split by kind (objects in storyboard file order, assets and progress in time order), with assets written to a caller-given storage.
   The core never writes `.osb`; that lives in the outer `OsbMpeg.Osb` project. Assets are always
   lossless: no quantization, approximate palette, dither or lossy format, ever; the quality floor
   applies only to representations. There is no CLI, no `.osbv`, no tuner and no scene pre-pass. The unit of work is a coherent change, not a semantic object:
