@@ -92,7 +92,7 @@ Quy ước dùng trong bảng:
   kê từng thay đổi cụ thể cho `implementation-plan.md`.
 - **No-go:** G2 fail trên nội dung sạch ở mọi mức sàn; hoặc G3b fail (v1 chặt rẻ hơn); hoặc G7 lộ đường
   nối mà không có biện pháp khả thi; hoặc G4: người dùng không thấy mức sàn nào đạt. Khi đó báo cáo đề
-  xuất hướng thay thế, ví dụ cải tiến v1 (dither, tham số chặt) thay cho closed loop.
+  xuất hướng thay thế, ví dụ cải tiến v1 (tham số chặt; asset vẫn lossless theo D19) thay cho closed loop.
 
 ---
 

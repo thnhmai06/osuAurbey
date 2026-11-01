@@ -8,7 +8,7 @@ hướng.
 
 ## 0. Cách dùng tài liệu này
 
-**Thứ tự ưu tiên nguồn.** Tài liệu này là nguồn cho *xây gì*: mọi quyết định đã chốt (mục 2, D1 đến D18),
+**Thứ tự ưu tiên nguồn.** Tài liệu này là nguồn cho *xây gì*: mọi quyết định đã chốt (mục 2, D1 đến D19),
 kiến trúc và invariants (mục 4), từng bước từ Phase A tới M1 (mục 8) và lộ trình sau M1 (mục 12).
 `docs/direction.md` là nguồn cho *lý do*: chẩn đoán, sự thật về osu!, không gian representation, bảng
 bác bỏ (mục 8 của nó), prior art (mục 10) và lịch sử đo (mục 11). Hai tài liệu không override nhau:
@@ -50,9 +50,10 @@ OsuParsers bằng compile. Muốn tra thêm thư viện thì dùng context7 ho�
 
 ## 1. Mục tiêu cuối và phạm vi
 
-OsbMpeg trở thành **một thư viện .NET 10, một assembly `OsbMpeg`**. Nó biến **một video** thành tập
-object storyboard osu! biểu diễn bằng object model của OsuParsers, cộng các asset PNG. Kết quả phải đạt
-bốn điều:
+OsbMpeg trở thành **một thư viện .NET 10**. Lõi là assembly `OsbMpeg`: nó trích tách **một video** thành
+tập object storyboard osu! biểu diễn bằng object model của OsuParsers, trả ra **dưới dạng stream bất đồng
+bộ** cùng tiến độ, và ghi asset PNG lossless vào nơi lưu do caller chỉ định. Lõi **không ghi `.osb`** và
+không biết cú pháp văn bản của nó; việc đó thuộc project ngoài `OsbMpeg.Osb`. Kết quả phải đạt năm điều:
 
 1. **Chất lượng:** mọi frame, tại fps yêu cầu, đạt sàn tuyệt đối của preset. Điều này được kiểm chứng
    độc lập với encoder (mục 7).
@@ -60,8 +61,11 @@ bốn điều:
    caller chỉ định, dùng lại được xuyên lần gọi, xuyên video và xuyên tiến trình.
 3. **An toàn đồng thời:** nhiều compile song song trong một tiến trình, hoặc nhiều tiến trình OsbMpeg
    dùng chung một thư mục asset, không bao giờ ghi đè nhau và không đọc phải file dở.
-4. **Không phụ thuộc nơi lưu:** `.osb` ghi qua `TextWriter`, asset đi qua `IAssetStorage`. Trong
+4. **Không phụ thuộc nơi lưu hay format ghi:** object trả qua stream, asset đi qua `IAssetStorage`. Trong
    memory chỉ giữ metadata; pixel được nạp lười và có giới hạn.
+5. **Asset lossless:** mọi asset giải mã lại phải trùng từng byte với pixel nguồn đã cắt. Không lượng tử
+   hóa, không palette xấp xỉ, không dither, không encoding lossy dưới bất kỳ hình thức nào (D19). Sàn chất
+   lượng chỉ áp cho *cách biểu diễn* (crossfade, tint, transform), không bao giờ cho asset.
 
 **Không còn** CLI, format `.osbv`, auto-tuner, scene pre-pass.
 
@@ -69,7 +73,7 @@ bốn điều:
 và Crossfade. Verifier chạy mặc định sau mỗi compile.
 
 **Ngoài phạm vi.** Các mục sau chỉ có concept ở mục 12: motion (M2), animation và thrash, thực thi ngân
-sách workload, encoding asset lossy, attribution, dataset, nhiều video dùng chung decode, nguồn frame
+sách workload, tối ưu nén PNG lossless, attribution, dataset, nhiều video dùng chung decode, nguồn frame
 tùy biến, lookahead.
 
 ---
@@ -80,12 +84,12 @@ tùy biến, lookahead.
 | --- | --- | --- |
 | D1 | osu!lazer là chuẩn verify, stable ở mức best-effort | Không phát bất cứ thứ gì đã biết là lazer đọc sai. Value-chaining bị REJECT. `S` và `V` là hai property riêng (lazer nhân `Scale × VectorScale` [deepwiki]). Thứ chỉ rủi ro trên stable thì cảnh báo, không fail. |
 | D2 | Sàn chất lượng cứng là mặc định; library trả report, không throw khi vi phạm | `VerificationReport.Passed = false` là kết quả hợp lệ, không phải exception. |
-| D3 | Public gồm: facade compile, API encode một video trả object để caller chèn vào storyboard của họ, renderer, verifier. Encoder core để internal. | Xem mục 4.2. `ICandidateProvider` để internal, chưa mở plugin. |
-| D4 | Bỏ `.osbv`. Method chính chỉ xử lý **một** `VideoAnimation`. Command lồng trong video dùng object model của OsuParsers. Cache nằm ngay trong thư mục asset, chỉ theo nội dung. Caller chỉ định thư mục asset riêng để không lẫn với asset storyboard có sẵn. | Ranh giới public (vào và ra) là OsuParsers. IR nội bộ (`SbDocument`, …) chuyển thành `internal`. Đây là cách hòa giải D3 với D4: "IR public" ở D3 được hiểu là object model OsuParsers. OsuParsers object không mang layer, nên result phải mang `Layer` và có `AddTo(Storyboard)`. |
-| D5 | Trừu tượng hóa nơi lưu tối đa. `.osb` ghi qua `StreamWriter`/`TextWriter`. Asset quản lý kiểu database: index trong memory, nội dung trên storage, pixel nạp lười hoặc async, không nạp dồn. | `IAssetStorage` là public (mục 5). `AssetIndex` chỉ giữ metadata. Renderer và verifier nạp pixel lười với cache LRU có trần theo byte. |
+| D3 | Public của lõi gồm: API compile một video trả **stream sự kiện bất đồng bộ** (object đã xong, asset, tiến độ, kết quả cuối), helper gom stream thành kết quả, renderer, verifier, storage. Encoder core để internal. Lõi không có writer `.osb`. | Xem mục 4.2. `ICandidateProvider` để internal, chưa mở plugin. Object được phát khi không còn bước nào sửa được nó (mục 4.3), kèm khóa `Order` tường minh vì thứ tự phát không phải thứ tự vẽ. |
+| D4 | Bỏ `.osbv`. Method chính chỉ xử lý **một** `VideoAnimation`. Command lồng trong video dùng object model của OsuParsers. Cache nằm ngay trong thư mục asset, chỉ theo nội dung. Caller chỉ định thư mục asset riêng để không lẫn với asset storyboard có sẵn. | Ranh giới public (vào và ra) là OsuParsers. IR nội bộ (`SbDocument`, …) chuyển thành `internal`. Đây là cách hòa giải D3 với D4: "IR public" ở D3 được hiểu là object model OsuParsers. OsuParsers object không mang layer hay thứ tự, nên mỗi object phát ra kèm `Layer` và `Order`; kết quả gom có `AddTo(Storyboard)` sắp theo `Order`. Thời gian: lõi nhận `StartOffset` (mốc ms trên storyboard mà frame tại `From` xuất hiện) và mọi thời gian trong object trả ra đã cộng sẵn offset đó (mục 6). |
+| D5 | Trừu tượng hóa nơi lưu tối đa. Lõi không ghi file văn bản nào. Asset quản lý kiểu database: index trong memory, nội dung trên storage, pixel nạp lười hoặc async, không nạp dồn. | `IAssetStorage` là public (mục 5). `AssetIndex` chỉ giữ metadata. Renderer và verifier nạp pixel lười với cache LRU có trần theo byte. |
 | D6 | Chỉ .NET 10 | `net10.0`, không multi-target. |
 | D7 | `Fps` = số frame chương trình xử lý và biểu diễn mỗi giây. Ép video về fps đó rồi xử lý tiếp; frame bị loại được frame trước đại diện. | Resample bằng filter `fps=` của ffmpeg (đã có trong `FrameSource`). `null` nghĩa là fps nguồn. Fps lớn hơn nguồn chỉ tốn thời gian, không đổi output, nên không cần xử lý riêng. |
-| D8 | Không CLI; chỉ core engine | Xóa `OsbMpeg.Cli` và test của nó. Harness đo nằm trong test project (mục 9). |
+| D8 | Không CLI; lõi chỉ trích tách, không ghi format | Xóa `OsbMpeg.Cli` và test của nó. Ghi `.osb` nằm trong project ngoài `OsbMpeg.Osb` tham chiếu lõi, gồm writer và test round-trip văn bản; lõi không tham chiếu ngược. Harness đo nằm trong test project (mục 9). |
 | D9 | Được đổi format, nhưng quy tắc đặt tên asset phải nhất quán và **chỉ phụ thuộc nội dung pixel**. Tối ưu truy vấn, không tạo file hoặc folder vô nghĩa. | Key = XXH3-128 trên (tag phiên bản, format pixel, kích thước, pixel cuối cùng được lưu). Bỏ seed `colors`. Animation lưu phẳng, không mỗi animation một folder. Không file index, không file phụ. |
 | D10 | Plan chi tiết cho phần trước mắt; phần chưa biết chỉ nêu concept và khả thi | Mục 8 chi tiết (Phase A, M0, M0.5, M1). Mục 12 là spec mức bước cho phần sau M1, chi tiết file và test viết khi tới lượt. |
 | D11 | Nhiều tiến trình OsbMpeg chạy song song trên cùng thư mục asset phải an toàn | Hợp đồng "tạo nếu chưa có" nguyên tử (mục 5.1). Ghi file tạm rồi rename, không bao giờ ghi đè. |
@@ -97,13 +101,14 @@ tùy biến, lookahead.
 
 | D17 | **Vật thể di chuyển làm lộ nền được xử lý theo hai nấc.** Nấc a (M2.5a): theo dõi vùng của X bằng quỹ đạo Sim(2), biểu diễn X bằng *một* sprite cắt theo bounding rect kèm track, chạy nhân quả; nền vừa lộ ra *không* được dựng riêng mà để closed loop vá bằng patch như mọi vùng bẩn khác, và patch đó được chèn **dưới** X. Nấc b (M2.5b): mask và alpha cho X, dựng nền nhìn trước cả đoạn, khử lem màu ở mép; chỉ xây khi số đo của nấc a cho thấy bucket `rect-halo` hoặc `reveal-strip` đủ lớn. | Không có pass tích lũy, không dựng nền, không alpha ở M2.5a. Cần ba thay đổi nền tảng ở M2 (S2.R, S2.G) và chèn-dưới trong `ReconstructionState`/`EmitContext` (S1.2). Gate theo đoạn bằng kiểm thử khô; bị từ chối thì output trùng byte với bước trước. |
 | D18 | **Solver (CP-SAT, ILP) là thước đo trước khi là công cụ.** Dùng làm oracle offline cho R3 để đo ladder greedy bỏ phí bao nhiêu; chỉ được vào lõi ở bài toán ngân sách workload M3 (multiple-choice knapsack theo lát thời gian) khi oracle hoặc số vi phạm ngân sách đòi. Không dùng làm bộ chọn representation toàn cục trong lúc encode. | `Google.OrTools` chỉ được thêm vào project đo hoặc test, không vào assembly `OsbMpeg` cho tới khi S3.1b được duyệt. Các bài toán con có cấu trúc tốt hơn giữ thuật toán chuyên dụng: chia đoạn easing dùng DP, z-order K ≤ 4 duyệt hết, gán block vào layer dùng graph cut nếu cần, span crossfade dùng greedy. |
+| D19 | **Asset luôn lossless.** Asset là pixel nguồn cắt nguyên vẹn; PNG giải mã lại phải trùng từng byte. Cấm lượng tử hóa, palette xấp xỉ, dither, JPEG, WebP hay AVIF lossy, giảm độ phân giải. Sàn chất lượng của preset chỉ áp cho cách biểu diễn, không cho asset. | Tối ưu kích thước chỉ bằng cách lossless: mức nén và filter PNG, bỏ kênh alpha khi ảnh đặc, ghi grayscale khi R = G = B ở mọi pixel, PNG indexed chỉ khi ảnh có không quá 256 màu phân biệt; mọi biến thể đều có test giải mã trùng từng byte (S3.3). Asset luôn ở độ phân giải nguồn (R2 của `direction.md`). |
 ---
 
 ## 3. Quan hệ với `docs/direction.md`
 
 Không có override. `direction.md` đã được viết lại để khớp mọi quyết định ở mục 2: không CLI, không
-`.osbv`, không scene pre-pass, không shared decode; `S` và `V` là hai property riêng; value-chaining và
-`[Variables]` bị bác; JPEG là INVESTIGATE; photometric chỉ dùng `C`; encoder composite trên display model
+`.osbv`, không scene pre-pass, không shared decode, lõi không ghi `.osb`; `S` và `V` là hai property riêng; value-chaining và
+`[Variables]` bị bác; asset luôn lossless; photometric chỉ dùng `C`; encoder composite trên display model
 riêng còn verifier render IR; mọi A/B so với tag `v1-baseline`. Những gì tài liệu này **lấy nguyên** từ
 đó: cơ chế ladder, headroom và hysteresis, preset hai trục (PSNR mỗi frame, worst-tile SSIM), M0.5 là
 điểm dừng chờ người, bảng bác bỏ (mục 8 của nó), và lịch sử đo (mục 11 của nó, nơi mọi acceptance ghi
@@ -117,15 +122,14 @@ số).
 
 ```text
 OsbMpeg.slnx
-src/OsbMpeg/OsbMpeg.csproj              net10.0, một assembly duy nhất
+src/OsbMpeg/OsbMpeg.csproj              net10.0, lõi trích tách; không biết cú pháp .osb
   *.cs (root, namespace OsbMpeg)        PUBLIC API (mục 4.2)
   Storage/                              public: IAssetStorage, FileSystemAssetStorage
                                         internal: AssetIndex, AssetKey, AssetEntry
   Ir/                                   internal: SbDocument, SbObject, SbCommand…, CanvasMapping,
                                         LoopFlattener, Utilities (IsEqual)
   Ir/Passes/                            internal: MergeAdjacentCommands, DropNoOpCommands, LoopExtractor
-  Osb/                                  public: StoryboardWriter
-                                        internal: OsbWriter, OsuParsersConverter, StoryboardDecoderGate
+  Conversion/                           internal: OsuParsersConverter (IR ↔ object OsuParsers)
   Rendering/                            public: StoryboardRenderer (M0)
                                         internal: CommandEvaluator, EasingTable, Compositor, Canvas,
                                         SoftwareStoryboardRenderer, AssetPixelCache (M0)
@@ -137,7 +141,10 @@ src/OsbMpeg/OsbMpeg.csproj              net10.0, một assembly duy nhất
                                         Candidates/*
   Verification/                         internal: Metrics, ErrorMap, DirtyRects, QualityVerifier,
                                         WorkloadAnalyzer, PropertyOverlapValidator, CalibrationSimulator
-tests/OsbMpeg.Tests/OsbMpeg.Tests.csproj   gộp Parsers.Tests và Compiler.Tests
+src/OsbMpeg.Osb/OsbMpeg.Osb.csproj      net10.0, lớp ngoài, tham chiếu OsbMpeg
+  *.cs (namespace OsbMpeg.Osb)          public: StoryboardWriter
+                                        internal: OsbWriter, StoryboardDecoderGate
+tests/OsbMpeg.Tests/OsbMpeg.Tests.csproj   gộp Parsers.Tests và Compiler.Tests; tham chiếu cả hai project
 tests/fixtures/                         mp4 có sẵn, cộng synthetic ở S1.14
 ```
 
@@ -153,7 +160,7 @@ namespace OsbMpeg;
 public sealed record VideoAnimation
 {
     public required string VideoPath { get; init; }        // đường dẫn tương đối resolve theo CWD, giống File API của .NET
-    public required int StartTime { get; init; }           // "at": mốc ms trên storyboard mà frame tại From xuất hiện
+    public required double StartOffset { get; init; }      // mốc ms trên storyboard mà frame tại From xuất hiện; mọi thời gian trả ra đã cộng sẵn
     public TimeSpan From { get; init; } = TimeSpan.Zero;   // điểm bắt đầu trong video
     public TimeSpan? To { get; init; }                     // null nghĩa là tới hết video
     public double? Fps { get; init; }                      // null nghĩa là avg fps của nguồn (D7)
@@ -187,21 +194,36 @@ public sealed record QualityPreset(double PsnrFloorDb, double TileSsimFloor, dou
 public sealed class OsbMpegCompiler
 {
     public OsbMpegCompiler(CompileOptions options, ILogger? logger = null);   // validate options ngay (mục 5.7)
-    public Task<VideoCompileResult> CompileAsync(VideoAnimation video,
+    // Stream sự kiện: object đã xong, asset, tiến độ; sự kiện cuối luôn là CompileCompleted.
+    public IAsyncEnumerable<CompileEvent> CompileAsync(VideoAnimation video, CancellationToken cancellationToken = default);
+    // Helper: tiêu thụ stream, chuyển tiến độ qua IProgress, trả object đã sắp theo Order.
+    public Task<VideoCompileResult> CompileToResultAsync(VideoAnimation video,
         IProgress<CompileProgress>? progress = null, CancellationToken cancellationToken = default);
-    public Task<VerificationReport> VerifyAsync(VideoAnimation video, IReadOnlyList<IStoryboardObject> objects,
+    public Task<VerificationReport> VerifyAsync(VideoAnimation video, IReadOnlyList<CompiledObject> objects,
         IProgress<CompileProgress>? progress = null, CancellationToken cancellationToken = default);  // bước S0.6
 }
 
-// Bước A5 (Workload thêm ở S0.5, Verification thêm ở S0.6)
+// Bước A5. Một object đã xong. Order tăng dần = thứ tự khai báo = z-order trong layer; thứ tự phát
+// trên stream KHÔNG phải thứ tự vẽ (object đóng sớm có thể nằm trên object đóng muộn, và patch vá nền
+// có thể được chèn dưới một layer đã phát). Order là khóa có khoảng trống, chỉ dùng để so sánh.
+public sealed record CompiledObject(IStoryboardObject Object, StoryboardLayer Layer, long Order);
+
+public abstract record CompileEvent;
+public sealed record ObjectCompiled(CompiledObject Item) : CompileEvent;
+public sealed record AssetStored(string Path, int Width, int Height, long Length, bool Created) : CompileEvent;
+public sealed record ProgressReported(CompileProgress Progress) : CompileEvent;
+public sealed record CompileCompleted(CompileStatistics Statistics, WorkloadReport? Workload,
+    VerificationReport? Verification) : CompileEvent;
+
+// Bước A5 (Workload thêm ở S0.5, Verification thêm ở S0.6). Kết quả gom của CompileToResultAsync.
 public sealed record VideoCompileResult(
     StoryboardLayer Layer,
-    IReadOnlyList<IStoryboardObject> Objects,   // thứ tự = thứ tự khai báo = z-order trong layer
+    IReadOnlyList<CompiledObject> Objects,      // đã sắp theo Order
     CompileStatistics Statistics,
     WorkloadReport? Workload,
     VerificationReport? Verification)           // null khi Verify = false
 {
-    public void AddTo(Storyboard storyboard);   // storyboard.GetLayer(Layer).AddRange(Objects)
+    public void AddTo(Storyboard storyboard);   // storyboard.GetLayer(Layer).AddRange(Objects theo Order)
 }
 
 public sealed record CompileStatistics(int FrameCount, double Fps, int SpriteCount, int AnimationCount,
@@ -229,6 +251,7 @@ public readonly record struct WorkloadSample(double TimeMs, int AliveSprites, do
 public class OsbMpegException : Exception { /* ctor chuẩn */ }
 public sealed class VideoDecodeException : OsbMpegException { /* ctor chuẩn */ }
 
+// ---- Project ngoài OsbMpeg.Osb, không thuộc lõi ----
 namespace OsbMpeg.Osb;
 public static class StoryboardWriter    // bước A4
 {
@@ -264,13 +287,19 @@ validate VideoAnimation (mục 10.1)
 → FrameSource.ReadFramesAsync(W×H, fpsEff, From, To-From)                          [Encoding]
     → ClosedLoopEncoder: frame → FrameWindow → AdvanceTo → ErrorMap → DirtyRects → ladder
       → Commit (EmitContext, AssetIndex) → Apply
-→ EmitContext.FinalizeAll → IR (baker nếu có group commands) → passes (Merge, DropNoOp, LoopExtractor)
-→ PropertyOverlapValidator (có lỗi thì OsbMpegException, vì đó là bug nội bộ)
-→ OsuParsersConverter.ToOsuParsers (làm tròn thời gian, mục 6) → Objects
-→ WorkloadAnalyzer
+      → mỗi item khi đã xong: EmitContext.Finalize → IR (baker nếu có group commands)
+        → passes theo object (Merge, DropNoOp, LoopExtractor) → PropertyOverlapValidator
+        → OsuParsersConverter.ToOsuParsers (làm tròn thời gian, mục 6) → phát ObjectCompiled
+→ EmitContext.FinalizeAll: phát nốt các item còn mở
+→ WorkloadAnalyzer (trên IR đã giữ lại)
 → nếu Verify: QualityVerifier (mục 7), decode lần hai                               [Verifying]
-→ VideoCompileResult
+→ phát CompileCompleted
 ```
+
+"Đã xong" nghĩa là item đã đóng và không còn bước nào sửa được nó. Ở M1 đó là lúc item đóng. Từ M3, pass
+hậu kỳ gom patch thành `Animation` có thể thay item trong cảnh, nên item của một cảnh chỉ được phát ở cuối
+cảnh. Lỗi validator là bug nội bộ: stream ném `OsbMpegException`. Lõi giữ IR của các object đã phát (vài
+trăm byte mỗi object, không giữ pixel) cho tới hết lần gọi để `WorkloadAnalyzer` và verifier dùng.
 
 ### 4.4 Ai sở hữu state nào
 
@@ -280,9 +309,9 @@ validate VideoAnimation (mục 10.1)
 | File asset | `IAssetStorage` | vĩnh viễn | library không bao giờ xóa hay ghi đè |
 | `ReconstructionState`, `FrameWindow`, `EmitContext`, `BlockOwnership` | một lần `CompileAsync` | một video | không chia sẻ |
 | IR nội bộ | `CompilePipeline` | một lần gọi | không lộ ra ngoài |
-| `IReadOnlyList<IStoryboardObject>` | caller | sau khi trả về | library không giữ tham chiếu |
+| `CompiledObject` đã phát | caller | ngay khi phát | lõi chỉ giữ bản IR riêng, không giữ tham chiếu tới object OsuParsers |
 | Cache pixel của renderer | một renderer instance | một lần render hoặc verify | LRU có trần byte |
-| Lock `StoryboardDecoderGate` | static toàn process | process | state toàn cục duy nhất được phép (OsuParsers không reentrant) |
+| Lock `StoryboardDecoderGate` | static trong `OsbMpeg.Osb` | process | chỉ ở lớp ngoài; decoder của OsuParsers không reentrant. Lõi không dùng decoder |
 
 ### 4.5 Invariants
 
@@ -292,8 +321,9 @@ Mọi code, hiện tại và tương lai, phải giữ. Vi phạm là bug kiến
   Mọi representation, hiện có hay thêm sau, phát ra `SbSprite` hoặc `SbAnimation` cùng command chuẩn
   vào `SbDocument`; không có kênh phụ, không có "gợi ý cho renderer" nằm ngoài IR. Ranh giới public là
   OsuParsers, và chỉ có đúng một converter hai chiều (`OsuParsersConverter`).
-- **I2.** Verification độc lập là thẩm quyền cuối. Output đi qua vòng text (`StoryboardWriter`, rồi
-  `StoryboardDecoder` của OsuParsers, rồi IR) trước khi render bằng renderer IR; verifier không dùng
+- **I2.** Verification độc lập là thẩm quyền cuối. Verifier render đúng object OsuParsers đã phát, đổi
+  lại sang IR qua converter, tức đã qua làm tròn thời gian; vòng văn bản `.osb` thuộc test của
+  `OsbMpeg.Osb`. Verifier verifier không dùng
   `ReconstructionState` in-memory của encoder. Encoder dùng display model riêng. Dùng chung thư viện
   tầng thấp (`Compositor`, `CommandEvaluator`) thì được, khác nhau ở orchestration và nguồn dữ liệu.
 - **I3.** Chuỗi fallback luôn kết thúc ở `PatchProvider`, và provider cuối này không bao giờ fail vì nó
@@ -322,11 +352,11 @@ Mọi code, hiện tại và tương lai, phải giữ. Vi phạm là bug kiến
   encoding) phải là mở rộng của key, không phải một cơ chế song song.
 - **I11.** Library không bao giờ xóa hay ghi đè một asset đã tồn tại. Ngoại lệ duy nhất là file tạm của
   chính nó đã quá hạn (mục 5.2).
-- **I12.** Không có state toàn cục thay đổi được, trừ lock của OsuParsers. Cấu hình ffmpeg đi theo từng
+- **I12.** Lõi không có state toàn cục thay đổi được; lock duy nhất của OsuParsers nằm ở `OsbMpeg.Osb`. Cấu hình ffmpeg đi theo từng
   lần gọi, không dùng `GlobalFFOptions.Configure`.
 - **I13.** Public surface bị khóa bằng snapshot test. Muốn thêm type hay member public thì phải sửa file
   approved một cách có chủ đích.
-- **I14 (phủ kín).** Từ `StartTime` tới hết video, mọi pixel trong rect của video phải được phủ bởi ít
+- **I14 (phủ kín).** Từ `StartOffset` tới hết video, mọi pixel trong rect của video phải được phủ bởi ít
   nhất một item opaque (alpha nội dung bằng 1). Trong library, video nằm trên storyboard của caller:
   chỗ nào không được phủ thì layer bên dưới hoặc background beatmap sẽ lộ ra. Những thứ tồn tại để giữ
   I14:
@@ -340,6 +370,9 @@ Mọi code, hiện tại và tương lai, phải giữ. Vi phạm là bug kiến
 - **I15.** Lõi `OsbMpeg` không phụ thuộc model học, PyTorch hay ONNX (D13). Thứ cần model chạy trong
   tiến trình riêng và giao tiếp bằng file mask và alpha qua một contract internal; thiếu nó, pipeline
   vẫn chạy đầy đủ với provider classical.
+- **I16 (lossless).** Mọi asset ghi qua `AssetIndex` giải mã lại trùng từng byte với pixel đã đưa vào. Có
+  test kiểm điều này cho mọi biến thể nén. Không đường code nào được biến đổi pixel asset (D19).
+- **I17 (không format).** Lõi không tham chiếu `OsbMpeg.Osb` và không chứa code sinh hay đọc văn bản `.osb`.
 
 ### 4.6 Kiểm tra ngược: kiến trúc có mở không
 
@@ -349,8 +382,8 @@ vì bốn lý do. Lõi encoder chỉ biết `ICandidateProvider` và `IRepresent
 thêm class rồi đăng ký vào danh sách provider kèm rank. `ReconstructionState` composite từ *object IR*
 trong display list chứ không từ "loại representation", nên nó render được candidate mới mà không cần
 biết đó là gì; điều kiện duy nhất là primitive động mới nằm trong tập command mà `CommandEvaluator`
-đánh giá được, và tập đó chính là toàn bộ command space của `.osb`. Verifier render từ output đã qua
-vòng text nên theo định nghĩa không biết representation nào sinh ra nó. Giả thuyết phân rã mới (layer
+đánh giá được, và tập đó chính là toàn bộ command space của `.osb`. Verifier render từ object đã phát nên
+theo định nghĩa không biết representation nào sinh ra nó. Giả thuyết phân rã mới (layer
 set, panorama, sau này là bất cứ gì) chỉ là một analyzer mới ghi thêm vào `SceneMotionInfo` cộng một
 provider mới tiêu thụ nó.
 
@@ -403,9 +436,8 @@ tiến trình dựa trên đúng điều đó.
   `"OSBMPEG-ASSET-V1"` (ASCII) ‖ kind (1 byte: 0 = sprite, 1 = animation) ‖ pixel format (1 byte:
   0 = Rgb24) ‖ width (int32 LE) ‖ height (int32 LE) ‖ frameCount (int32 LE, sprite = 1) ‖ pixel của từng
   frame.
-- **Pixel được hash là pixel cuối cùng mà file lưu.** M1 chỉ có PNG lossless không quantize, nên đó
-  chính là pixel crop từ frame. Khi sau này có encoding lossy (mục 12), key là hash của pixel sau
-  lossy, nên vẫn chỉ phụ thuộc nội dung.
+- **Pixel được hash là pixel crop từ frame**, cũng chính là pixel file lưu, vì asset luôn lossless (D19).
+  Cách nén PNG không nằm trong key: hai cách nén lossless của cùng pixel là cùng một asset.
 - Kích thước nằm trong key để sửa bug hiện có: `AssetStore.GetOrAdd` hash mỗi byte pixel, nên hai crop
   đơn sắc khác kích thước (ví dụ 10×20 và 20×10 cùng màu đen) trùng key và dùng nhầm file.
 - Tag phiên bản `V1` là hằng số cho mọi video. Đổi cách encode trong tương lai thì tăng `V2`; cache cũ
@@ -480,7 +512,8 @@ chỉ ghi vào `{AssetDirectory}/s/` (sau này thêm `/a/`), không đụng tớ
 
 ## 6. Thời gian, fps và làm tròn
 
-- `fpsEff = video.Fps ?? MediaInfo.SourceFps`. Validate `0 < fpsEff ≤ 1000`.
+- `fpsEff = video.Fps ?? MediaInfo.SourceFps`. Validate `0 < fpsEff ≤ 1000`. `StartOffset` phải hữu hạn;
+  âm được phép, vì osu! chấp nhận thời gian âm.
 - Frame i được lấy bằng `FrameSource` với filter `fps`, seek `From`, duration `To - From`.
 - **Ngữ nghĩa bắt buộc (D7):** frame output i là frame nguồn *mới nhất* có `pts ≤ From + i/fpsEff`. Frame
   bị loại được frame trước đó đại diện, không bao giờ bởi frame sau.
@@ -491,12 +524,12 @@ chỉ ghi vào `{AssetDirectory}/s/` (sau này thêm `/a/`), không đụng tớ
     60→24, 60→30, 24→60 và 23,976→30, rồi khẳng định chỉ số frame nguồn đúng theo ngữ nghĩa trên. Ghi giá
     trị đã chọn và lý do vào doc comment của `FrameSource`.
 - Thời gian local của frame i là `localMs(i) = i · 1000 / fpsEff` (double). Thời gian storyboard là
-  `StartTime + localMs(i)`. Frame cuối hiển thị tới `StartTime + FrameCount · 1000 / fpsEff`, với
+  `StartOffset + localMs(i)`. Frame cuối hiển thị tới `StartOffset + FrameCount · 1000 / fpsEff`, với
   `FrameCount` là số frame decode thực nhận được.
 - IR giữ double. Làm tròn chỉ xảy ra **ở một chỗ**: `OsuParsersConverter.ToOsuParsers`, theo quy tắc
   `(int)Math.Round(ms, MidpointRounding.AwayFromZero)`, giống `OsbWriter.FormatTime` hiện có. Làm tròn
   đơn điệu nên track rời nhau vẫn rời nhau. Verifier chạy trên object *đã* làm tròn.
-- Verifier lấy mẫu tại **giữa frame**: `t_i = StartTime + (i + 0.5) · 1000 / fpsEff`. Ranh giới làm tròn
+- Verifier lấy mẫu tại **giữa frame**: `t_i = StartOffset + (i + 0.5) · 1000 / fpsEff`. Ranh giới làm tròn
   lệch tối đa 0,5 ms, còn điểm giữa frame cách ranh giới ít nhất 0,5 ms (tại fps ≤ 1000), nên không
   bao giờ lấy mẫu trúng ranh giới.
 - Encoder đánh giá tại `localMs(i)`, dùng đúng frame i, không lệch.
@@ -517,8 +550,9 @@ Hai phía, render bằng **cùng** renderer IR (sau S0.4), trên cùng canvas:
   - Khi không có group command, expected chính là frame i, pixel-exact (bilinear tại tỉ lệ 1:1 là
     copy).
   - Cách dựng này **không** đi qua `GroupTransformBaker`, nên bug của baker sẽ lộ ra.
-- **actual(t_i):** các object output đi qua `StoryboardWriter`, rồi
-  `StoryboardDecoderGate.Decode(lines)`, rồi IR, rồi render.
+- **actual(t_i):** các `CompiledObject` đã phát, sắp theo `Order`, đi qua `OsuParsersConverter.ToIr`, rồi
+  render. Đây là đúng object caller nhận, đã làm tròn ms. Vòng ghi văn bản rồi đọc lại được kiểm riêng ở
+  test của `OsbMpeg.Osb` (A4).
 - **So sánh:** `Metrics.Psnr` trên cả frame và `Metrics.TileSsim(...).Min`. Vi phạm khi
   `psnr < Preset.PsnrFloorDb` hoặc `tileMin < Preset.TileSsimFloor`.
 - **Tính nhất quán với encoder:** encoder bảo đảm mọi block 16×16 đạt `blockPSNR ≥ P`. Vì MSE của frame
@@ -628,21 +662,23 @@ Commit: `refactor: merge Parsers and Compiler into single OsbMpeg assembly`.
 
 Commit: `feat(storage): content-addressed asset index with atomic cross-process storage`.
 
-**A4. Converter và writer.**
+**A4. Converter trong lõi, writer ở project ngoài.**
 
-- `Osb/OsuParsersConverter.cs`, internal:
+- `Conversion/OsuParsersConverter.cs`, internal trong lõi:
   - `ToIr(IStoryboardObject, StoryboardLayer) → SbObject` và `ToIr(CommandGroup) → List<SbCommand>`:
     chuyển từ `OsbReader` hiện có, chỉ đổi chỗ đặt.
   - `ToOsuParsers(SbObject) → IStoryboardObject`: làm tròn thời gian theo mục 6. Ghép
     `VectorScaleX`/`VectorScaleY` thành một `V` bằng cùng logic `VectorPair` trong
     `OsbWriter.NormalizeCommands` (tách ra thành helper dùng chung, không viết lại). `MoveX`/`MoveY` giữ
     dạng `MX`/`MY`. Loop thành `LoopCommand`. Trigger thành `TriggerCommand`.
-- `Osb/StoryboardWriter.cs`, public: `Write(Storyboard, TextWriter)`. Mỗi object của từng layer đi qua
-  `ToIr` rồi `OsbWriter` (đổi `OsbWriter.Write(doc, path)` thành `Write(doc, TextWriter)`, giữ overload
+- Tạo project `src/OsbMpeg.Osb` tham chiếu lõi; `InternalsVisibleTo("OsbMpeg.Osb")` trên lõi để dùng
+  converter và IR. Chuyển `OsbWriter` sang đây. `StoryboardWriter.cs`, public: `Write(Storyboard,
+  TextWriter)`. Mỗi object của từng layer đi qua `ToIr` rồi `OsbWriter` (đổi `OsbWriter.Write(doc, path)` thành `Write(doc, TextWriter)`, giữ overload
   path cho test cũ nếu cần). Sample ghi `Sample,{time},{layer},"{path}",{volume}` nếu A0 xác nhận
   shape; nếu không thì throw `NotSupportedException` khi `SamplesLayer` khác rỗng. `Variables` khác
   rỗng thì throw `NotSupportedException`.
-- `OsbReader.Read(path)` giữ lại cho test, nhưng đi qua converter.
+- `OsbReader.Read(path)` và `StoryboardDecoderGate` chuyển sang `OsbMpeg.Osb`; test lõi cần đọc `.osb`
+  golden thì tham chiếu project ngoài, lõi không.
 - Test:
   - round-trip IR → OsuParsers → IR bằng nhau (sau làm tròn) cho mọi loại command, easing 0, 2, 3, 34,
     loop lồng, trigger;
@@ -650,7 +686,7 @@ Commit: `feat(storage): content-addressed asset index with atomic cross-process 
   - ghi dưới culture `vi-VN` không sinh dấu phẩy thập phân;
   - `Variables` khác rỗng thì throw.
 
-Commit: `feat(osb): OsuParsers converter and TextWriter-based StoryboardWriter`.
+Commit: `feat: OsuParsers converter in core, StoryboardWriter in OsbMpeg.Osb`.
 
 **A5. Facade public trên encoder cũ.**
 
@@ -667,25 +703,29 @@ Commit: `feat(osb): OsuParsers converter and TextWriter-based StoryboardWriter`.
     Tham số cố định lấy từ baseline của tuner: TileSize 64, HashQuantLevels 32, TileTolerance 8,
     Colors 0, Gop 300, MinAnimationUniqueness 0,8, NoQuadtree false, MaxAssetPixels 17 000 000,
     RawSnapshot false. Toàn bộ cửa sổ là một đoạn, không scene detection;
-  - `EmitTarget` với `CanvasMapping(W, H, Position.X, Position.Y)`, `Layer`, offset `StartTime`, và baker
+  - `EmitTarget` với `CanvasMapping(W, H, Position.X, Position.Y)`, `Layer`, offset `StartOffset`, và baker
     nếu có commands;
-  - passes, rồi `ToOsuParsers`, rồi result;
-  - kiểm tra đếm object qua vòng `StoryboardWriter` → `Decode` (thay `OsbValidator`).
+  - passes, rồi `ToOsuParsers`, rồi phát `ObjectCompiled` khi encoder legacy đóng run, `Order` = thứ tự
+    emit; `CompileToResultAsync` gom stream;
+  - kiểm tra đếm object qua converter hai chiều IR, OsuParsers, IR (thay `OsbValidator`).
 - `FrameSource` và `MediaProbe`: nhận `FfmpegSettings`, dựng `FFOptions { BinaryFolder = … }` theo từng
   lần gọi, truyền vào `ProcessAsynchronously(true, ffOptions)` và `FFProbe.AnalyseAsync(path, ffOptions, ct)`.
   Hwaccel đi qua `ExtraInputArgs = $"-hwaccel {mode}"` như cũ. Lỗi ffmpeg bọc thành `VideoDecodeException`
   (giữ exception gốc làm inner).
-- Progress: `Probing` một lần; `Encoding` mỗi 10 frame; hoàn tất ở 100%.
+- Progress: sự kiện `ProgressReported`, `Probing` một lần, `Encoding` mỗi 10 frame; `CompileCompleted` là
+  sự kiện cuối. Hủy qua `CancellationToken` dừng decode và không để lại file tạm.
 - Logging: `ILogger` cho các sự kiện mức scene hoặc video, không log từng frame.
 - Test:
   - validate (mục 10.1) mỗi nhánh một test;
   - **fixture nhẹ** (luôn chạy; skip khi không tìm thấy ffmpeg, dùng `Assert.Skip`): `easy/sequence`
     0 đến 2 giây, độ phân giải và fps gốc, vào thư mục tạm. Khẳng định: có object; mọi file nằm dưới `{AssetDirectory}/s/`; ngoài
-    cây đó không có file hay folder nào khác được tạo trong storage root; lần compile thứ hai cho
-    `AssetsCreated == 0` và `Objects` giống hệt; hai compiler instance chạy `Task.WhenAll` trên cùng thư
+    cây đó không có file hay folder nào khác được tạo trong storage root; mọi asset giải mã lại trùng
+    từng byte với crop (I16); lần compile thứ hai cho `AssetsCreated == 0` và `Objects` giống hệt; hai compiler instance chạy `Task.WhenAll` trên cùng thư
     mục đều thành công, object giống nhau, không còn `.tmp`.
-  - **So sánh object:** OsuParsers object không có value equality, nên "giống hệt" nghĩa là text của
-    `StoryboardWriter` bằng nhau.
+  - **So sánh object:** OsuParsers object không có value equality, nên "giống hệt" nghĩa là dump chuẩn
+    hóa của IR sau `ToIr` (helper trong test) bằng nhau, cùng `Layer` và `Order`.
+  - **Stream:** thứ tự sự kiện hợp lệ (tiến độ không giảm, `CompileCompleted` cuối cùng và đúng một lần),
+    và `CompileToResultAsync` cho cùng object với việc tự gom stream.
   - **Test tính quyết định** (cache, so sánh hai lần chạy) luôn dùng cửa sổ `From = 0`. Mục 13.5 của
     direction đã đo được decode của ffmpeg lệch ±1 frame ở biên cửa sổ khi seek.
   - Test ngữ nghĩa fps (mục 6) thuộc bước này.
@@ -713,8 +753,9 @@ Commit: `refactor!: remove CLI, .osbv, tuner, scene prepass and legacy stores`.
 
 **A7. Internalize và khóa surface.**
 
-- Mọi type không có trong mục 4.2 chuyển thành `internal` (type lồng nhau cũng vậy).
-- Test `PublicApiSnapshotTests`: reflection lấy mọi type public trong assembly, cùng member public và
+- Mọi type không có trong mục 4.2 chuyển thành `internal` (type lồng nhau cũng vậy). Test kiến trúc:
+  assembly lõi không tham chiếu `OsbMpeg.Osb` và không chứa chuỗi cú pháp `.osb` như `[Events]` (I17).
+- Test `PublicApiSnapshotTests`: reflection lấy mọi type public trong `OsbMpeg` và `OsbMpeg.Osb`, cùng member public và
   protected với chữ ký dạng text, sắp xếp. So với `tests/OsbMpeg.Tests/PublicApi.approved.txt`. Khác
   nhau thì fail và in diff. File approved được tạo ở bước này và commit.
 
@@ -725,8 +766,8 @@ Commit: `refactor: internalize implementation, lock public API surface`.
 - `CLAUDE.md`: viết lại phần "What this is", Commands (test project mới, không CLI), Architecture
   (một assembly, public API, storage), Conventions (mục 5 và 6 tóm tắt). Giữ quy tắc về baker và
   ppy/osu#7257.
-- `README.md` ngắn: ví dụ dùng library, gồm `new FileSystemAssetStorage(beatmapDir)`, `CompileAsync`,
-  `AddTo`, `StoryboardWriter.Write`, cùng lưu ý R8 (`WidescreenStoryboard: 1` nằm trong `.osu`) và lưu ý
+- `README.md` ngắn: ví dụ dùng library, gồm `new FileSystemAssetStorage(beatmapDir)`, `await foreach` trên
+  `CompileAsync`, `CompileToResultAsync` rồi `AddTo`, và ghi file bằng `OsbMpeg.Osb.StoryboardWriter.Write`, cùng lưu ý R8 (`WidescreenStoryboard: 1` nằm trong `.osu`) và lưu ý
   ffmpeg.
 
 Commit: `docs: library-first CLAUDE.md and README`.
@@ -863,7 +904,8 @@ Commit: `feat(rendering): RGBA bilinear renderer, lazy bounded asset cache, publ
 **S0.5. `WorkloadAnalyzer`** (`Verification/`).
 
 - Input: IR đã `Prepare`, kích thước asset qua `AssetIndex.TryGet` (hoặc header PNG qua storage nếu
-  thiếu), và số dòng `.osb` từ `StoryboardWriter` vào một `StringWriter` đếm dòng.
+  thiếu), và số dòng `.osb` *ước lượng* từ IR: một dòng mỗi object, cộng một mỗi command và mỗi
+  header loop. Lõi không ghi văn bản để đếm.
 - Tại mỗi mốc 100 ms trong `[minStart, maxEnd]`:
   - object alive nếu `Lifetime` chứa t (bảo thủ, OQ-5);
   - diện tích = bbox của quad sau transform (evaluate tại t), tính trong storyboard units, chia
@@ -1083,7 +1125,7 @@ internal interface ICandidateProvider
 - `Finalize(item, endMs)` và `FinalizeAll(videoEndMs)` sinh IR:
   - **Không có baker:** `SbSprite` với `Origin = TopLeft`, `X/Y = mapping.PixelToStoryboard(rect.X, rect.Y)`,
     một lệnh `S` hằng bằng `mapping.StoryboardScale` trên `[start, end]`, cộng lệnh `F` từ track alpha
-    (nếu khác hằng 1) và lệnh `C` từ track tint (nếu khác hằng trắng). Thời gian = `StartTime + localMs`.
+    (nếu khác hằng 1) và lệnh `C` từ track tint (nếu khác hằng trắng). Thời gian = `StartOffset + localMs`.
   - **Có baker:** `Origin = Centre`, tâm rect đổi qua mapping, `baker.Bake(center, baseScale, start,
     end, offset, contentTracks)`. Baker mở rộng như sau:
     - group không có `F`: nối track alpha của nội dung nguyên văn thành lệnh `F`;
@@ -1308,7 +1350,8 @@ D7 riêng.
 | Mép patch lệch nhỏ khi group có rotate hoặc scale ≠ 1 (bilinear tại mép từng sprite so với một texture liền) | Thấp | Chấp nhận. Verify có thể báo vi phạm sát sàn; ghi vào report, không nới sàn |
 | Sprite bị che một phần tích tụ, overdraw tăng | Trung bình | `BlockOwnership` đóng sprite bị che kín; peak có trong `WorkloadReport`; ngân sách ở M3 |
 | Group có chuyển động: baker lấy mẫu mỗi frame cho *từng* sprite sống. Sprite của closed loop sống lâu và có thể chồng nhau, nên số command tăng theo số sprite sống × số frame | Trung bình | Đo `CommandCount` và `OsbLineCount` trong acceptance 9; concept "fit trajectory cho group" (R2) ở mục 12 |
-| OsuParsers `StoryboardDecoder` không thread-safe | Thấp | Mọi lần gọi đi qua `StoryboardDecoderGate` |
+| Caller nhận object theo thứ tự phát rồi chèn thẳng vào layer, sai z-order | Trung bình | `Order` là bắt buộc trên `CompiledObject`; `AddTo` và README sắp theo `Order`; test M2.5a có patch phát sau nhưng `Order` nhỏ hơn |
+| OsuParsers `StoryboardDecoder` không thread-safe | Thấp | Chỉ `OsbMpeg.Osb` dùng decoder, mọi lần gọi đi qua `StoryboardDecoderGate`; lõi không dùng |
 | Antivirus hoặc indexer khóa file mới trên Windows | Thấp | Retry có backoff (mục 5.2) |
 | Asset trong cache bị xóa từ bên ngoài giữa lúc chạy | Thấp | Verifier lộ lỗi; ghi trong doc comment |
 | `FrameSource` có thể bỏ lại một reader mồ côi khi ffmpeg không mở pipe (doc comment hiện có) | Thấp | Giữ nguyên hành vi đã đo; bọc thành `VideoDecodeException` |
@@ -1317,10 +1360,12 @@ D7 riêng.
 
 ## 11. Tiêu chí hoàn thành tổng (hết tài liệu này)
 
-- Một assembly `OsbMpeg` trên `net10.0`. Không còn project CLI, `.osbv`, tuner hay scene pre-pass.
+- Lõi `OsbMpeg` và lớp ngoài `OsbMpeg.Osb` trên `net10.0`; lõi không ghi `.osb`. Không còn project CLI,
+  `.osbv`, tuner hay scene pre-pass.
 - Public API đúng mục 4.2 và bị khóa bằng snapshot.
-- `OsbMpegCompiler.CompileAsync` cho một video ra object OsuParsers, asset content-addressed trong
-  thư mục dành riêng, `VerificationReport` và `WorkloadReport`.
+- `OsbMpegCompiler.CompileAsync` cho một video ra stream object OsuParsers kèm `Layer` và `Order`, asset
+  lossless content-addressed trong thư mục dành riêng, `VerificationReport` và `WorkloadReport` trong sự
+  kiện cuối.
 - Cache: compile lại cùng nội dung tạo 0 asset mới. Nhiều instance hoặc tiến trình dùng chung thư mục
   không có lỗi, không ghi đè, không còn file tạm.
 - Encoder closed loop với Patch, Photometric và Crossfade. Verify độc lập pass `Medium` trên mọi fixture.
@@ -1343,7 +1388,7 @@ mục 8. Mọi số đo ghi vào mục 11 của `direction.md`; mọi A/B so v�
 | R2 | Easing rời rạc cộng piecewise trong `TrajectoryFitter` (12.4) | ngay sau M2 | ≥ 30% command bytes trên `authored`, 0 verify regression; trượt thì giữ RDP linear |
 | M2.5a | Layer nhân quả theo rect: X là một sprite di chuyển, nền lộ ra do closed loop vá và chèn dưới X (12.5) | sau R2 | trên `authored`: bytes ≤ 0,5× M2 và sprite ≤ 0,2× M2, verify 100%; trên medium và hard: bytes không tăng quá 2%, verify 100%; trượt thì quay về DEFER tới M3.5 |
 | M2.5b | Mask và alpha cho X, dựng nền nhìn trước, khử lem màu (12.6) | sau M2.5a, chỉ khi bucket `rect-halo` hoặc `reveal-strip` ≥ 20% bytes trên `authored` | bytes ≤ 0,7× M2.5a trên fixture kích hoạt nó, verify 100%, không fixture nào tệ đi |
-| M3 | Ngân sách workload, `Animation` có cap, encoding asset (12.7) | sau M2.5 (ngân sách và animation có thể sớm hơn nếu số của M1 đòi) | acceptance trong 12.7 |
+| M3 | Ngân sách workload, `Animation` có cap, nén PNG lossless (12.7) | sau M2.5 (ngân sách và animation có thể sớm hơn nếu số của M1 đòi) | acceptance trong 12.7 |
 | R3 | Oracle ILP đo oracle gap của ladder (12.8) | sau M3 | là instrument; gap ≥ 10% thì đề xuất nâng bộ chọn, dưới 10% thì đóng câu hỏi ladder |
 | M3.5 | Attribution và quy trình quyết định (12.8) | sau M3 và R3 | không phải feature |
 | Sidecar | `ILayerBoundaryRefiner` bằng model matting trong tiến trình Python (12.9) | sau M3.5 | chỉ xây khi bucket `layer-edge` ≥ 20% bytes hoặc verify fail tập trung ở biên layer trên 2D animation |
@@ -1580,7 +1625,7 @@ delta, `α(t)` đóng dạng, gate clamp ≤ 2% và SSIM. Chi phí thêm: một 
 Spike A4 (additive trên glow thật) và A5 (chi phí GPU của sidecar, chỉ khi gate 12.9 mở) thuộc nấc này.
 Acceptance M2.5b: keep-gate ở 12.1; trên `object_reveal_textured` bucket `reveal-strip` gần 0 và verify 100%.
 
-### 12.7 M3: ngân sách, animation, encoding asset
+### 12.7 M3: ngân sách, animation, nén PNG lossless
 
 Phụ thuộc M1 cho ngân sách và encoding, M2 không bắt buộc cho encoding.
 
@@ -1606,22 +1651,17 @@ Gate uniqueness như bản cũ (ít nhất 80% frame khác nội dung), logic đ
 gọn lại. Test: bad_apple 5 giây có animation resident trong ngân sách và giữ sàn; vùng nhấp nháy A/B
 chỉ có hai nội dung thì *không* được thành animation, vì dedupe sprite thắng.
 
-**S3.3 Tìm encoding asset (MUST cho palette có dither, INVESTIGATE cho JPEG).** JPEG đã đo *tệ hơn*
-PNG một lần (+6,5% trên anime, +62,6% trên bad_apple, doc comment `AssetStore.cs`), nên chỉ được giữ nếu
-hai điều cùng đúng: OQ-4 pass (tự tay bỏ một `.jpg` vào storyboard test, load trong osu! stable và lazer,
-xác nhận render) và đo trên `standard` của footage cho thấy giảm từ 30% mà không thủng gate. Một trong
-hai fail thì bỏ JPEG, chỉ giữ dither palette.
+**S3.3 Nén PNG lossless (MUST, theo D19).** `AssetIndex` thử các cách ghi lossless cho mỗi asset mới và
+giữ bản nhỏ nhất: mức nén zlib và chiến lược filter PNG; RGB khi mọi alpha là 255; grayscale khi R = G = B
+ở mọi pixel; indexed khi ảnh có không quá 256 màu phân biệt, với bảng màu chính xác. Mỗi biến thể được giải
+mã lại và so từng byte với pixel đầu vào trước khi ghi; lệch thì bỏ biến thể đó và ghi log như bug. Key
+không đổi (mục 5.3), vì cách nén không phải nội dung. Cấm mọi biến đổi pixel: lượng tử hóa, palette xấp xỉ,
+dither, JPEG, WebP hay AVIF lossy, giảm độ phân giải. Test: ảnh đơn sắc, ảnh ≤ 256 màu, ảnh xám, ảnh có
+alpha và ảnh chụp đều giải mã trùng từng byte; ảnh 257 màu không đi đường indexed.
 
-`AssetStore.GetOrAdd(pixels, w, h, consumer, EncodingPolicy)` thử các ứng viên gồm PNG thô, PNG palette
-256/128/64 kèm Floyd-Steinberg, và JPEG q95/q90/q85 chỉ khi vùng opaque; decode lại, tính `TileSsim` so
-với gốc, yêu cầu đạt `preset.TileSsimFloor + 0.02`, rồi chọn bytes nhỏ nhất. Key = hash pixel *sau* lossy (mục 5.3, D9), nên vẫn chỉ phụ thuộc nội dung; tăng tag lên `V2` nếu đổi
-quy tắc; phần mở rộng file theo format. Quyết định được cache theo content-hash nên asset đã gặp không phải tìm lại. Test:
-gradient thì palette bị loại bởi gate SSIM, ảnh chụp thì JPEG thắng, và dedupe vẫn đúng khi hai policy
-cùng chạy trong một compile.
-
-Acceptance M3: bad_apple giữ sàn với animation trong ngân sách; palette có dither giảm asset bytes mà
-không thủng gate trên `authored` và `fish-short`; JPEG được giữ hay bỏ theo đúng hai điều kiện ở S3.3,
-ghi số; không fixture nào vượt ngân sách mặc định hoặc có violation report rõ ràng.
+Acceptance M3: bad_apple giữ sàn với animation trong ngân sách; nén lossless giảm asset bytes so với
+mức nén mặc định trên `authored` và `fish-short`, ghi số, với 100% asset giải mã trùng từng byte; không
+fixture nào vượt ngân sách mặc định hoặc có violation report rõ ràng.
 
 ### 12.8 M3.5: checkpoint attribution
 

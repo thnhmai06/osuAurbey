@@ -21,7 +21,7 @@ pass straight through to output IR unchanged.
 
 Three documents, each with one job:
 
-- `docs/implementation-plan.md` says what to build: every settled decision (D1 to D18), the target
+- `docs/implementation-plan.md` says what to build: every settled decision (D1 to D19), the target
   architecture and invariants (I1 to I15), each step from Phase A to M1 with API, tests and acceptance,
   and the post-M1 order (R1 dataset, M2 global motion, R2 easing, M2.5a causal rect layers, gated M2.5b
   masks and background plate, M3, R3 solver oracle, M3.5, a gated model sidecar). Start here.
@@ -38,8 +38,11 @@ Three things those documents settle, and that cost real time to re-derive:
   the run tracker is open-loop so slow changes never close a run, and there is exactly one output
   primitive (a static crop plus one `S` command), so any camera motion re-emits the whole canvas
   every frame.
-- The target is a library that compiles one video; there is no CLI, no `.osbv`, no tuner and no
-  scene pre-pass in the new design. The unit of work is a coherent change, not a semantic object:
+- The target is a library that extracts one video into OsuParsers objects, returned as an async event
+  stream with an explicit `Layer` and `Order` per object, with assets written to a caller-given storage.
+  The core never writes `.osb`; that lives in the outer `OsbMpeg.Osb` project. Assets are always
+  lossless: no quantization, approximate palette, dither or lossy format, ever; the quality floor
+  applies only to representations. There is no CLI, no `.osbv`, no tuner and no scene pre-pass. The unit of work is a coherent change, not a semantic object:
   layers are proposed from motion and accepted only when the closed loop measures them cheaper.
   Learned models (SAM, matting) are allowed only as an optional boundary refiner in a separate
   process, behind a measured gate.

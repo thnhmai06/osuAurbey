@@ -7,7 +7,7 @@ lịch sử đo đạc. Nó không chứa bước triển khai. Ba tài liệu c
 | Tài liệu | Trả lời câu hỏi | Khi mâu thuẫn |
 | --- | --- | --- |
 | `docs/direction.md` (file này) | vì sao, sự thật về osu!, không gian lựa chọn, đã đo được gì | sự thật và số đo ở đây là nguồn |
-| `docs/implementation-plan.md` | xây gì, theo thứ tự nào, với API và acceptance nào; mọi quyết định đã chốt (D1 đến D18), invariants, lộ trình từ Phase A tới M3.5 | quyết định thi công ở đó là nguồn; nếu nó đòi một sự thật khác với file này thì sửa file này, không override |
+| `docs/implementation-plan.md` | xây gì, theo thứ tự nào, với API và acceptance nào; mọi quyết định đã chốt (D1 đến D19), invariants, lộ trình từ Phase A tới M3.5 | quyết định thi công ở đó là nguồn; nếu nó đòi một sự thật khác với file này thì sửa file này, không override |
 | `docs/feasibility-plan.md` | kiểm chứng gì trước khi viết code sản phẩm (spike ném đi, tiêu chí pass/fail chốt trước) | |
 
 Người triển khai đọc `implementation-plan.md` trước, quay lại đây khi cần lý do. Gặp điểm tài liệu không
@@ -388,7 +388,7 @@ Không gian tìm kiếm phân rã tự nhiên thành bốn tầng gần độc l
 (1) Phân rã mỗi scene:        chọn tập layer (K model, có panorama không, ranh giới thời gian)
 (2) Representation mỗi vùng:  chọn T1..T13 cho từng dirty region
 (3) Keyframe mỗi track:       nén trajectory và span crossfade
-(4) Encoding mỗi asset:       PNG, PNG palette có dither, JPEG
+(4) Nén mỗi asset:           PNG lossless, chọn cách nén nhỏ nhất
 ```
 
 | Tầng | Thuật toán | Vì sao không cần nặng hơn |
@@ -396,7 +396,7 @@ Không gian tìm kiếm phân rã tự nhiên thành bốn tầng gần độc l
 | (1) | matching pursuit: thêm layer hoặc panorama khi lợi ích biên đo được lớn hơn chi phí biên | số ứng viên nhỏ (K ≤ 4, panorama có hoặc không); lợi ích đo rẻ trên bản downscale; sai thì closed loop trả bằng patch chứ không bằng artifact |
 | (2) | ladder: thử từ rẻ tới đắt, nhận cái đầu tiên đạt sàn | fidelity là ràng buộc cứng nên bài toán là min cost có ràng buộc, không phải đánh đổi theo λ; chi phí các bậc cách nhau hàng bậc độ lớn nên greedy xấp xỉ tối ưu |
 | (3) | RDP joint trong screen space cho track; mở rộng greedy cho span crossfade | error đơn điệu theo span nên greedy tối ưu |
-| (4) | thử các encoding, verify SSIM, chọn bytes nhỏ nhất | độc lập hoàn toàn theo từng asset nên exhaustive là đúng nghĩa đen |
+| (4) | thử các cách ghi PNG lossless, kiểm giải mã trùng từng byte, chọn bytes nhỏ nhất | độc lập hoàn toàn theo từng asset nên exhaustive là đúng nghĩa đen; asset không bao giờ bị biến đổi pixel (D19) |
 
 Bác bỏ (đến khi đo được greedy bỏ phí hơn 10 đến 15% trên corpus): global graph optimization, beam
 search, DP toàn cục, RDO quét λ. Lý do chung: interaction giữa các quyết định đã bị chặn bởi kiến
@@ -468,7 +468,7 @@ Loop      := đường cú pháp, flatten được; Trigger nằm ngoài phạm 
 
 Ba tính chất quyết định chiến lược. Thứ nhất, semantics đã executable: encoder composite trên một
 display model riêng (rect căn pixel, track alpha và tint tuyến tính từng đoạn), còn verifier render IR
-bằng renderer độc lập sau khi output đã đi qua vòng text; hai bản thật sự độc lập, và đó là điều kiện
+bằng renderer độc lập trên chính object đã phát, sau khi đổi qua lại với OsuParsers; hai bản thật sự độc lập, và đó là điều kiện
 tiên quyết của mọi synthesis-by-verification. Thứ hai, compose theo z là compositional: thêm
 object chỉ ảnh hưởng vùng nó phủ, nên synthesis cục bộ hợp lệ. Thứ ba, mỗi track có số chiều thấp, nên
 fit một segment là bài curve-fitting cổ điển và rẻ.
@@ -603,7 +603,7 @@ metric tầng hai nào được làm gate.
 | Đổi ánh sáng toàn cục | không | T8, hoặc T9 khi cần sáng thêm | gần như miễn phí |
 | Dissolve | không | T3 native | gần như miễn phí |
 | Wipe | không | sprite của scene B kèm track M, mép cứng | T2 nếu wipe theo hình lạ |
-| Nhiễu và grain | phá đồng thời motion coherence, dedupe và crossfade | không hướng nào cứu được | JPEG asset cộng preset thấp hơn |
+| Nhiễu và grain | phá đồng thời motion coherence, dedupe và crossfade | không hướng nào cứu được | preset thấp hơn cho cách biểu diễn; asset vẫn lossless nên nhiễu trả bằng bytes |
 | Occlusion | không | hệ quả của kiến trúc (5.3) | không |
 
 Nhiễu là ranh giới vật lý của toàn bộ cách tiếp cận này. Dữ liệu cũ đã cho thấy: tuner bó tay trên
@@ -637,8 +637,8 @@ Mỗi dòng một hướng, kèm điều kiện đảo quyết định. Không h
 | DP đặt keyframe | RDP đủ theo mọi số đo hiện có | nhỏ | thấp | không đổi | DEFER | đo thấy RDP bỏ phí keyframe đáng kể |
 | Fuzzy, pHash Hamming hay embedding cho near-dup, thay asset không verify pixel | O(N²) và rủi ro sàn; hai asset gần giống thay nhau giữa hai run kề sinh pop; canonical exact phủ phần lớn (5.4) | nhỏ so với canonical | cao | không đổi | REJECT | canonical reuse đã ship mà bucket near-dup vẫn lớn, và chỉ khi có verify SSIM so với sàn |
 | Animation fallback (T7) | thrash có thật (bad_apple); R4 giới hạn memory | chặn nổ sprite count | thấp | native, đắt memory | MUST (M3), có cap | không |
-| JPEG asset | dữ liệu DEFLATE cũ gợi ý ảnh chụp nén kém bằng PNG, nhưng một lần đo thật cho JPEG *tệ hơn* PNG: +6,5% trên anime, +62,6% trên bad_apple (doc comment `AssetStore.cs`) | chưa rõ | thấp | cần OQ-4 xác nhận | INVESTIGATE (M3), không MUST | đo trên `standard` của footage cho thấy giảm từ 30% mà không thủng gate, và OQ-4 pass |
-| WebP hoặc AVIF | chưa có bằng chứng osu! load được | chưa rõ | thấp | chưa xác nhận | REJECT cho tới khi verify | xác nhận cả stable và lazer load được |
+| JPEG, WebP, AVIF lossy, palette xấp xỉ, dither, giảm độ phân giải asset | người dùng chốt asset luôn lossless (D19); đo cũ còn cho JPEG tệ hơn PNG: +6,5% trên anime, +62,6% trên bad_apple; palette không dither là một nguyên nhân mờ của v1 (1.1) | âm về chất lượng | thấp | được osu! hỗ trợ một phần | REJECT vĩnh viễn (D19) | không |
+| Nén PNG lossless tốt hơn (mức nén, filter, RGB, grayscale, indexed khi ≤ 256 màu thật) | giảm bytes mà pixel giải mã trùng từng byte | nhỏ tới vừa, lớn trên nội dung màu phẳng | thấp | native | MUST (M3, S3.3) | không |
 | Fit easing rời rạc trong TrajectoryFitter | lý thuyết vững, fit dạng đóng nên rẻ (6.3); nội dung ưu tiên được author bằng tween (D14) | lớn trên nội dung được author, gần 0 trên trajectory nhiễu | thấp | native (35 easing cố định, không tham số tự do) | MUST (R2, ngay sau M2) | keep-gate: ≥ 30% command bytes trên `authored`, 0 verify regression; trượt thì giữ RDP linear |
 | Cubic Bézier, spring, curve tham số tự do trong track | `.osb` chỉ có 35 easing cố định; Bézier chỉ xấp xỉ được bằng chuỗi segment | âm (không phát được) | không đổi | không có | REJECT | osu! thêm easing tham số |
 | Dataset ground truth và metric tầng hai | generator và renderer đã có; Crello Animation và Animation2Code có ground truth sẵn; mở khóa câu hỏi "chọn sai ở đâu" | là hạ tầng đánh giá | trung bình | là instrument | MUST (R1, ngay sau M1) | không cần gate; sai lệch tier rẻ so với tier vàng tự nó là phát hiện |
@@ -664,7 +664,7 @@ Mỗi dòng một hướng, kèm điều kiện đảo quyết định. Không h
 | OQ-1 | Chiến lược re-composite nào của `ReconstructionState` nhanh nhất | vấn đề hiệu năng, không phải tính đúng | benchmark 2 chiến lược trên fish 5 giây | chỉ đổi bên trong class, giữ test đối chiếu render đầy đủ |
 | OQ-2 | Block matching có đủ tốt trên footage thật không, và trên motion graphics ít texture thì KLT trong support hay ECC trên pixel | chất lượng flow phụ thuộc nội dung; Zhang 2023 ghi flow neural lẫn SIFT và KLT kém trên motion graphics | S2.0 (`implementation-plan.md` mục 12) | code spike ném đi được, chỉ số liệu là deliverable |
 | OQ-3 | Con số preset cuối cùng | phụ thuộc nội dung | M0.5 | chờ người dùng xem ảnh, không tự chốt |
-| OQ-4 | osu! stable và lazer có load asset `.jpg` trong storyboard không | chưa verify thực tế | đầu S3.3 (`implementation-plan.md` mục 12) | khoảng 30 phút thủ công; fail thì bỏ JPEG, không tìm cách lách |
+| OQ-4 (đóng) | osu! stable và lazer có load asset `.jpg` trong storyboard không | không còn cần, vì D19 cấm asset lossy | không | không |
 | OQ-5 | Ngữ nghĩa alive chính xác cho `WorkloadAnalyzer` (alpha lớn hơn 0 lần đầu so với span command) | ảnh hưởng độ chính xác report, không ảnh hưởng output | hỏi cụ thể qua deepwiki khi cần | dùng bản bảo thủ (span command) tới lúc đó |
 
 ---
