@@ -19,8 +19,8 @@ Ký hiệu dùng xuyên suốt:
 
 | Ký hiệu | Nghĩa |
 | --- | --- |
-| `D1`…`D19` | quyết định đã chốt với người dùng (mục 6.1) |
-| `I1`…`I18` | invariant, vi phạm là bug kiến trúc (mục 6.2) |
+| `D1`…`D20` | quyết định đã chốt với người dùng (mục 6.1) |
+| `I1`…`I19` | invariant, vi phạm là bug kiến trúc (mục 6.2) |
 | `R1`…`R10` | sự thật về osu! mà thiết kế phải tôn trọng (mục 2) |
 | `T1`…`T13` | representation storyboard biểu diễn được (mục 3) |
 | `M0`…`M3.5`, `DS`, `EZ`, `OR` | nấc năng lực của pipeline (mục 12) |
@@ -46,7 +46,8 @@ Kết quả phải đạt năm điều:
 
 1. **Chất lượng:** mọi frame, tại fps yêu cầu, đạt sàn tuyệt đối của preset, được kiểm chứng độc lập với
    encoder (mục 9.11).
-2. **Asset lossless:** mọi asset giải mã lại trùng từng byte với pixel nguồn đã cắt. Không lượng tử hóa,
+2. **Asset lossless, tái hiện nguyên vẹn:** mọi asset là pixel cắt từ đúng một frame nguồn và giải mã lại
+   trùng từng byte với pixel đó (D19, I19). Không lượng tử hóa,
    không palette xấp xỉ, không dither, không encoding lossy dưới bất kỳ hình thức nào (D19). Sàn chất lượng
    chỉ áp cho *cách biểu diễn* (crossfade, tint, transform), không bao giờ cho asset.
 3. **Cache asset theo nội dung:** tên asset chỉ phụ thuộc pixel, nằm trong một thư mục dành riêng do caller
@@ -126,8 +127,19 @@ Dự đoán theo loại nội dung, dùng để đặt fixture và keep-gate:
 | Motion graphics, UI game, logo, text | tier `authored` (generator, Crello Animation, Animation2Code) | giảm sprite và asset 1 đến 2 bậc độ lớn; easing khớp chính xác; nhiều vùng 0 byte | layer Sim(2), easing rời rạc, canonical asset |
 | 2D animation sạch | `medium/fish-short` | giảm mạnh ở phần rigid, phần biến dạng (mặt, tay) rơi về crossfade hoặc patch | layer, canonical reuse, crossfade |
 | Game render 3D có camera | `hard/minecraft` | phần lớn lợi ích từ K=1 và panorama; foreground có parallax rơi về patch | global motion |
-| Footage thật, nhiễu | `hard/birdbrain`, `medium/fish` | gần 0; nhiễu là ranh giới vật lý (mục 13) | không có |
+| Footage thật, nhiễu | nền của `hard/birdbrain`, nền của `hard/machinelove` | gần 0; nhiễu là ranh giới vật lý (mục 13) | không có |
 | Silhouette nhấp nháy | `medium/badapple` | như Animation có cap | không có |
+
+Bảng trên được đối chiếu lại bằng cách xem khung hình của cả mười fixture ngày 2026-11-17 (chưa đo gì,
+số chỗ cắt cảnh là ước lượng bằng filter `scene` của ffmpeg ở ngưỡng 0,3). Mô tả từng fixture nằm ở
+`tests/fixtures/README.md`. Bốn điểm bảng dự đoán chưa phủ, ghi lại để các nấc sau có chỗ đặt số:
+
+| Fixture | Nội dung thật | Hệ quả cho dự đoán |
+| --- | --- | --- |
+| `medium/fish` | một con cá render 3D sạch trên nền trắng, xoay lặp theo vòng và nhỏ dần; 1 chỗ cắt trong 178 giây | không phải footage nhiễu. Xoay ngoài mặt phẳng nên mỗi frame là ảnh mới và rơi về patch; lợi ích chỉ có nếu vòng lặp được tái dùng, tức `LP` và canonical reuse, cả hai đang DEFER. Là fixture tự nhiên cho bucket `near-duplicate-assets` |
+| `hard/birdbrain` | nhân vật vẽ phẳng nhảy múa, ghép trên footage cầm tay; khoảng 110 chỗ cắt trong 255 giây | nền là footage (gần 0). Nhân vật là 2D animation nhưng đổi dáng theo từng nét vẽ, nên layer Sim(2) không giữ được và nó rơi về patch hoặc Animation có cap. Là ca thử cho điều kiện đảo của dòng "model học tinh chỉnh biên" (mục 14), không phải lý do đổi D12 |
+| `hard/rollback`, `hard/machinelove` | motion graphics dày kèm grain, glow, blur, rung và mặt phẳng nghiêng 3D; cảnh dài khoảng 1,2 đến 2 giây (127 chỗ cắt trong 155 giây, 150 trong 286 giây); `machinelove` có phụ đề sống qua chỗ cắt | là nội dung được author nhưng không sạch: effect phủ toàn màn hình đẩy phần lớn về bucket `noise`, cảnh ngắn chặn trên lợi ích vì mỗi cảnh tốn ít nhất một I-frame. Phụ đề là ca thử cho sprite sống qua ranh giới đoạn |
+| `easy/*` | hình tròn trượt, co giãn, đổi màu, chồng nhau, có hình bán trong suốt và một hình phóng to tới kín khung | là motion graphics đơn giản, không có ground truth chương trình. Dùng làm smoke test cho M2.5a và `EZ` trước khi tier `authored` có mặt |
 
 ---
 
@@ -200,7 +212,7 @@ load khoảng 3 giây và chạy được. Không có bức tường về số s
 | T6 | Panorama | asset lớn cắt thành strip, chung một track M | xấp xỉ hợp nội dung | strip alive, fill chỉ phần trên màn | camera pan hoặc scroll dài |
 | T7 | Animation | flipbook, frameDelay | N frame, không dedupe | N texture resident (R4) | thrash thật sự |
 | T8 | Photometric | `F` hoặc `C` trên sprite sẵn có | gần 0 | 0 mới | fade in/out, tint, đổi sáng cả vùng |
-| T9 | AdditiveLayer | sprite kèm `P,A` | 1 asset | +1 alive | glow, flash, lửa; thứ duy nhất làm sáng thêm được vì `C` chỉ nhân tối đi |
+| T9 | AdditiveLayer | sprite kèm `P,A` | 1 asset | +1 alive | glow, flash, lửa; thứ duy nhất làm sáng thêm được vì `C` chỉ nhân tối đi. Asset phải là crop thật (D19), ví dụ một frame flash trên nền đen; không dùng ảnh hiệu tổng hợp |
 | T10 | SpriteReuse | 1 asset, nhiều instance khác transform và thời gian | 1 asset | bằng số instance | motif lặp: particle giống nhau, UI, texture lặp |
 | T11 | SolidColor | asset đơn sắc nhỏ scale to | gần 0 | fill theo vùng | letterbox, fade to black, nền phẳng |
 | T12 | AlphaMatteSprite | PNG có alpha, mép feather | 1 asset | fill tính cả quad, kể cả texel trong suốt (R3) | mép mềm cho foreground layer, bắt buộc để layer không lộ viền chữ nhật |
@@ -250,6 +262,11 @@ flow theo block (block matching pyramidal)
    → thời gian: gán của frame trước làm prior cho frame sau
 ```
 
+Trên nội dung màu phẳng (motion graphics, 2D animation, D14) flow theo block yếu nhất, vì vùng một màu không
+có gì để khớp (OQ-2; Zhang 2023 ghi cả flow neural lẫn KLT đều kém ở đây). Vì vậy có nguồn đề xuất thứ hai: **vùng
+màu liền** (gom màu, màu trội làm nền, biên chia phần còn lại thành vùng, như Zhang 2023), rồi khớp vùng giữa hai
+frame bằng Sim(2). Hai nguồn chỉ là đề xuất; cả hai đi qua cùng một gate đo (D12, D20).
+
 K=1 chính là global camera motion. "Entity" là layer có support nhỏ. Đây cũng là định nghĩa làm việc
 duy nhất về "thực thể" trong dự án (D12): một *thay đổi liên kết*, tức vùng không-thời gian lớn nhất mà
 một primitive trong ladder giải thích được trong sàn. Không có object ngữ nghĩa, không có prompt; sprite
@@ -267,7 +284,7 @@ một trục lifetime của cùng cơ chế. Vì vậy phần motion phải đư
 | Motion layers (K≤4) | parallax, tách foreground; nội dung được author vốn là nhiều object độc lập | trung bình | layer phân mảnh do noise; mép layer cần alpha matte T12 | MUST (M2.5) với keep-gate trên tier `authored` |
 | Object tracking ngữ nghĩa (SAM 2/3 và tương đương) | không rõ | cao, GPU | output là mask hoặc box, storyboard chỉ tiêu được rect kèm similarity; tracker mất ID qua che khuất dài | REJECT làm xương sống (5.6, D12); chỉ còn là bộ tinh chỉnh biên tùy chọn trong sidecar, có gate (D13) |
 | Depth estimation | thứ tự z cho layer | cao | z-order suy được từ chính occlusion của motion layers | REJECT cho core |
-| Panorama, mosaic | pan dài, scroll | trung bình | mover nhiễm vào stitch (median cộng mask xử lý được); giới hạn texture; parallax trong nền phá stitch | DEFER tới checkpoint |
+| Panorama, mosaic | pan dài, scroll | trung bình | mover nhiễm vào stitch (trung vị chỉ để tìm mover, pixel dán lấy từ frame thật, D19); giới hạn texture; parallax trong nền phá stitch | DEFER tới checkpoint |
 | Suy luận occlusion | không rõ | gần 0 | không | byproduct, không phải feature (4.3) |
 | Photometric | fade, flash | gần 0 | ít | MUST (M1) |
 | Residual patches | mọi thứ còn lại | không rõ | không | tầng đáy vĩnh viễn |
@@ -303,9 +320,13 @@ atlas, nhưng vẫn dưới 4096. Cắt thành strip rộng tối đa 1024, tấ
 breakpoint đồng bộ. Strip ngoài màn bị GPU clip nên fill gần 0, chỉ tốn một ít alive count. Pan dài
 tùy ý chỉ là thêm strip, không chạm `MaxTextureSize`.
 
-Stitch bằng cách warp các frame về hệ panorama qua chính global transform đã có, tích lũy median theo
-từng pixel để loại mover, kèm confidence mask. Pixel chưa từng thấy được lấp bằng khuếch tán, confidence 0, không bao giờ được tin; closed loop sẽ patch khi
-nó lộ. Không để trong suốt, vì ở mép alpha mềm của layer phía trên lỗ sẽ lộ ra và vi phạm yêu cầu phủ kín. Asset bytes xấp xỉ hợp nội dung, tức cận dưới lý thuyết của mọi cách encode pan.
+Stitch hai lượt, theo cách của MPEG-4 sprite coding (Waseda R03): warp các frame về hệ panorama qua chính
+global transform đã có; lượt một lấy trung vị theo từng pixel *chỉ để tìm mover* (pixel lệch xa trung vị là
+mover), ảnh trung vị bị bỏ; lượt hai dán pixel của **một frame thật** cho mỗi vị trí, chọn frame mà vị trí đó
+không bị mover che và gần frame chuẩn nhất. Panorama vì vậy là ghép các mảnh crop thật, đúng D19. Pixel chưa từng
+thấy không được bịa (không khuếch tán, không inpaint): vị trí đó để trống, và closed loop patch khi nó lộ. Layer có
+mép alpha mềm không được nhận trên vùng nền còn trống, vì lỗ sẽ lộ qua mép và vi phạm I14; gate từ chối và rơi về
+rect đặc. Asset bytes xấp xỉ hợp nội dung, tức cận dưới lý thuyết của mọi cách encode pan.
 Điều kiện nhận: scene đã accept K=1 và residual thấp, nghĩa là nền thực sự rigid.
 
 ### 4.6 Vì sao không dùng semantic detection và learned model
@@ -370,7 +391,7 @@ hay đổi hình. Thứ closed loop *không* tự có là biểu diễn chính X
 | --- | --- | --- |
 | Chỉ patch (M1) | khoảng 60 patch cỡ X cộng dải lộ | không |
 | Rect nhân quả (M2.5a) | 1 sprite X cộng khoảng 60 patch dải hẹp | quỹ đạo Sim(2), display model có transform, chèn patch dưới X |
-| Phân rã có dựng nền (M2.5b) | 1 nền cộng 1 X | pass full-res tích lũy, mask và alpha, khử lem màu |
+| Phân rã có dựng nền (M2.5b) | 1 nền cộng 1 X | pass full-res ghép crop thật, mask và alpha (không khử lem màu, D19) |
 
 Rect nhân quả lấy được phần lớn khoản tiết kiệm so với M1 với một phần nhỏ độ phức tạp. Phần còn lại, chuỗi
 dải lộ và quầng nền bị kéo theo trong rect khi nền có texture, được đo bằng hai bucket `rect-halo` và
@@ -542,7 +563,7 @@ metric tầng hai nào được làm gate.
 
 ### 6.1 Quyết định đã chốt
 
-Chốt với người dùng ngày 2026-09-28, 2026-10-29 và 2026-11-01.
+Chốt với người dùng ngày 2026-09-28, 2026-10-29, 2026-11-01 và 2026-11-17.
 
 | ID | Quyết định | Hệ quả thi công |
 | --- | --- | --- |
@@ -557,14 +578,15 @@ Chốt với người dùng ngày 2026-09-28, 2026-10-29 và 2026-11-01.
 | D9 | Được đổi format, nhưng quy tắc đặt tên asset phải nhất quán và **chỉ phụ thuộc nội dung pixel**. Tối ưu truy vấn, không tạo file hoặc folder vô nghĩa. | Key = XXH3-128 trên (tag phiên bản, format pixel, kích thước, pixel cuối cùng được lưu). Bỏ seed `colors`. Animation lưu phẳng, không mỗi animation một folder. Không file index, không file phụ. |
 | D10 | Một tài liệu thiết kế duy nhất; plan triển khai được sinh từ nó. Code v1 chỉ là kho thành phần, không phải mốc so sánh | Tài liệu không chứa bước, commit hay test. Mỗi nấc năng lực có điều kiện nhận đo trên pipeline mới (mục 12); không acceptance nào so với v1 (mục 18). |
 | D11 | Nhiều tiến trình OsbMpeg chạy song song trên cùng thư mục asset phải an toàn | Hợp đồng "tạo nếu chưa có" nguyên tử (mục 8.1). Ghi file tạm rồi rename, không bao giờ ghi đè. |
-| D12 | **Không có khái niệm object hay thực thể ngữ nghĩa.** Đơn vị làm việc là *thay đổi liên kết* (coherent change): vùng không-thời gian lớn nhất mà một primitive trong ladder giải thích được trong sàn. "Sprite" là hệ quả của việc một track Sim(2) giải thích được một vùng, không phải đầu vào. | Không có kênh prompt, không có bước "định danh object". Layer được *đề xuất* bằng tín hiệu motion (block flow, sequential RANSAC Sim(2), liên thông không gian, prior thời gian) và được *nhận* chỉ khi closed loop đo thấy rẻ hơn. Re-identification xuyên che khuất và xuyên scene là canonical hash của asset (I10), không phải ID của tracker. |
+| D12 | **Không có khái niệm object hay thực thể ngữ nghĩa.** Đơn vị làm việc là *thay đổi liên kết* (coherent change): vùng không-thời gian lớn nhất mà một primitive trong ladder giải thích được trong sàn. "Sprite" là hệ quả của việc một track Sim(2) giải thích được một vùng, không phải đầu vào. | Không có kênh prompt, không có bước "định danh object". Layer được *đề xuất* bằng tín hiệu motion (block flow, sequential RANSAC Sim(2), liên thông không gian, prior thời gian) và được *nhận* chỉ khi closed loop đo thấy rẻ hơn. Re-identification xuyên che khuất và xuyên scene là canonical hash của asset (I10), không phải ID của tracker. Nguồn đề xuất thứ hai là vùng màu liền (D20). Điều kiện đảo: trên một fixture, layer theo vật (mask từ model) đo được rẻ hơn ≥ 30% bytes so với motion layer sau M2.5b mà verify vẫn 100%. |
 | D13 | **Lõi là .NET thuần; model học chỉ ở sidecar tùy chọn.** SAM 2/3, MatAnyone hoặc tương đương chạy trong tiến trình Python riêng, chỉ để *tinh chỉnh biên* (alpha matte) của layer đã được đề xuất bằng motion. Không có sidecar thì pipeline vẫn chạy đầy đủ. | Contract `ILayerBoundaryRefiner` (mục 10.2, sidecar ở mục 12). Sidecar chỉ được xây sau khi attribution (M3.5) chỉ ra bucket "mép layer" đủ lớn. Không thêm ONNX hay PyTorch vào assembly `OsbMpeg`. |
-| D14 | **Ưu tiên nội dung được author**: motion graphics, UI, 2D animation. Game và footage vẫn phải không tệ đi (verify pass, bytes không tăng), nhưng không là mục tiêu tối ưu trong 6 tháng tới. | Thêm tier fixture `authored` (mục 11.2 và `tests/fixtures/README.md`). R1 (dataset có ground truth chương trình) đi ngay sau M1, R2 (easing rời rạc) ngay sau M2, motion layer K>1 là M2.5 với keep-gate đo trên tier `authored` (mục 12). |
+| D14 | **Ưu tiên nội dung được author**: motion graphics, UI, 2D animation. Game và footage vẫn phải không tệ đi (verify pass, bytes không tăng), nhưng không là mục tiêu tối ưu trong 6 tháng tới. | Thêm tier fixture `authored` (mục 11.2). R1 (dataset có ground truth chương trình) đi ngay sau M1, R2 (easing rời rạc) ngay sau M2, motion layer K>1 là M2.5 với keep-gate đo trên tier `authored` (mục 12). |
 | D15 | **Thứ tự: bộ đo trước, vòng kín sau, provider sau cùng.** Verifier, renderer và metric (M0) rồi hiệu chuẩn preset (M0.5) đi trước vòng kín (M1); mọi provider khác đi sau vòng kín. | Mọi số đo về layer, easing, additive đều là số đo *sau* verify. Không spike provider nào trên code v1. |
-| D16 | **Các hướng đã bác bỏ có bằng chứng, không đề xuất lại** (bảng quyết định, mục 14): tracking ngữ nghĩa làm xương sống; freeze gate so với frame trước (vòng hở, chính là lỗi mờ của v1); nền động hay vùng lớn bằng `Animation` (R4); cubic Bézier và curve tham số tự do (không có trong `.osb`); dedupe theo pHash hay fuzzy không verify pixel (pop); cost function dự đoán với trọng số tay (đo thật thua 2,6 đến 5,4 lần); value-chaining và `[Variables]`. | Không viết code cho các mục này; muốn đảo thì phải có số đo nêu trong cột "điều gì đảo nó" của bảng đó. Những kỹ thuật được giữ cho M2.5: Sim(2) thay affine; `C` đóng dạng với master là frame sáng nhất; additive layer `Base + α(t)·Light` với base theo percentile, chỉ trong hệ sprite đã bù chuyển động; easing rời rạc + piecewise + chọn theo error + λ·complexity; canonical asset + instance; nền dựng từ pixel thật đã thấy (tích lũy theo mask, không ảo giác), pixel chưa từng thấy được lấp bằng khuếch tán và không bao giờ được tin (mục 12.6). |
-| D17 | **Vật thể di chuyển làm lộ nền được xử lý theo hai nấc.** Nấc a (M2.5a): theo dõi vùng của X bằng quỹ đạo Sim(2), biểu diễn X bằng *một* sprite cắt theo bounding rect kèm track, chạy nhân quả; nền vừa lộ ra *không* được dựng riêng mà để closed loop vá bằng patch như mọi vùng bẩn khác, và patch đó được chèn **dưới** X. Nấc b (M2.5b): mask và alpha cho X, dựng nền nhìn trước cả đoạn, khử lem màu ở mép; chỉ xây khi số đo của nấc a cho thấy bucket `rect-halo` hoặc `reveal-strip` đủ lớn. | Không có pass tích lũy, không dựng nền, không alpha ở M2.5a. Cần ba thay đổi nền tảng ở M2 (7.3, 9.4) và chèn-dưới trong `ReconstructionState`/`EmitContext` (7.3). Gate theo đoạn bằng kiểm thử khô; bị từ chối thì output trùng byte với bước trước. |
+| D16 | **Các hướng đã bác bỏ có bằng chứng, không đề xuất lại** (bảng quyết định, mục 14): tracking ngữ nghĩa làm xương sống; freeze gate so với frame trước (vòng hở, chính là lỗi mờ của v1); nền động hay vùng lớn bằng `Animation` (R4); cubic Bézier và curve tham số tự do (không có trong `.osb`); dedupe theo pHash hay fuzzy không verify pixel (pop); cost function dự đoán với trọng số tay (đo thật thua 2,6 đến 5,4 lần); value-chaining và `[Variables]`. | Không viết code cho các mục này; muốn đảo thì phải có số đo nêu trong cột "điều gì đảo nó" của bảng đó. Những kỹ thuật được giữ cho M2.5: Sim(2) thay affine; `C` đóng dạng với master là frame sáng nhất; additive layer T9 chỉ khi cả base và light là crop thật của một frame (D19), không phải ảnh percentile hay ảnh hiệu; easing rời rạc + piecewise + chọn theo error + λ·complexity; canonical asset + instance; nền dựng bằng cách dán pixel thật của từng frame (trung vị chỉ để tìm mover), pixel chưa từng thấy để trống cho closed loop vá (4.5, 10.2). |
+| D17 | **Vật thể di chuyển làm lộ nền được xử lý theo hai nấc.** Nấc a (M2.5a): theo dõi vùng của X bằng quỹ đạo Sim(2), biểu diễn X bằng *một* sprite cắt theo bounding rect kèm track, chạy nhân quả; nền vừa lộ ra *không* được dựng riêng mà để closed loop vá bằng patch như mọi vùng bẩn khác, và patch đó được chèn **dưới** X. Nấc b (M2.5b): mask và alpha cho X, dựng nền nhìn trước cả đoạn bằng crop thật (không khử lem màu, D19); chỉ xây khi số đo của nấc a cho thấy bucket `rect-halo` hoặc `reveal-strip` đủ lớn. | Không có pass tích lũy, không dựng nền, không alpha ở M2.5a. Cần ba thay đổi nền tảng ở M2 (7.3, 9.4) và chèn-dưới trong `ReconstructionState`/`EmitContext` (7.3). Gate theo đoạn bằng kiểm thử khô; bị từ chối thì output trùng byte với bước trước. |
 | D18 | **Solver (CP-SAT, ILP) là thước đo trước khi là công cụ.** Dùng làm oracle offline (`OR`, 11.4) để đo ladder greedy bỏ phí bao nhiêu; chỉ được vào lõi ở bài toán ngân sách workload M3 (multiple-choice knapsack theo lát thời gian) khi oracle hoặc số vi phạm ngân sách đòi. Không dùng làm bộ chọn representation toàn cục trong lúc encode. | `Google.OrTools` chỉ được thêm vào project đo hoặc test, không vào assembly `OsbMpeg` cho tới khi S3.1b được duyệt. Các bài toán con có cấu trúc tốt hơn giữ thuật toán chuyên dụng: chia đoạn easing dùng DP, z-order K ≤ 4 duyệt hết, gán block vào layer dùng graph cut nếu cần, span crossfade dùng greedy. |
-| D19 | **Asset luôn lossless.** Asset là pixel nguồn cắt nguyên vẹn; PNG giải mã lại phải trùng từng byte. Cấm lượng tử hóa, palette xấp xỉ, dither, JPEG, WebP hay AVIF lossy, giảm độ phân giải. Sàn chất lượng của preset chỉ áp cho cách biểu diễn, không cho asset. | Tối ưu kích thước chỉ bằng cách lossless: mức nén và filter PNG, bỏ kênh alpha khi ảnh đặc, ghi grayscale khi R = G = B ở mọi pixel, PNG indexed chỉ khi ảnh có không quá 256 màu phân biệt; mọi biến thể đều có test giải mã trùng từng byte (9.9). Asset luôn ở độ phân giải nguồn (R2). |
+| D19 | **Asset luôn lossless; mục tiêu là tái hiện nguyên vẹn** (xác nhận lại 2026-11-17). Asset là pixel nguồn cắt nguyên vẹn **từ đúng một frame**; PNG giải mã lại phải trùng từng byte. Cấm cả pixel tổng hợp: trung bình, trung vị hay percentile theo thời gian, khuếch tán hay inpaint lấp lỗ, khử lem màu `F = (I − (1−α)B)/α`, ảnh hiệu (`max delta`), khử nhiễu. Cấm lượng tử hóa, palette xấp xỉ, dither, JPEG, WebP hay AVIF lossy, giảm độ phân giải. Sàn chất lượng của preset chỉ áp cho cách biểu diễn, không cho asset. | Tối ưu kích thước chỉ bằng cách lossless: mức nén và filter PNG, bỏ kênh alpha khi ảnh đặc, ghi grayscale khi R = G = B ở mọi pixel, PNG indexed chỉ khi ảnh có không quá 256 màu phân biệt; mọi biến thể đều có test giải mã trùng từng byte (9.9). Asset luôn ở độ phân giải nguồn (R2). |
+| D20 | **Ra quyết định ngang hàng, theo số đo** (2026-11-17). Hai bản thiết kế được hợp nhất bằng cách xét từng điểm lệch theo mục tiêu (tái hiện nguyên vẹn, rồi nhẹ nhất trong ngân sách workload), không theo bản nào mới hơn. Hệ quả đã chốt: vùng màu liền là nguồn đề xuất layer thứ hai bên cạnh motion; mask cứng lấy từ vùng màu đi cùng M2.5a; điều kiện đảo của D12 được ghi thành số đo. | `ILayerProposer` có hai cài đặt (motion, vùng màu), cùng contract `LayerProposal`. `LayerProposal` thêm `hardMask(t)` tùy chọn ở độ phân giải pixel khi nguồn là vùng màu. Mask cứng không tạo pixel mới (alpha 0 hoặc 1 trên pixel nguồn), nên không đụng D19. |
 
 ### 6.2 Invariants
 
@@ -625,6 +647,9 @@ Mọi code, hiện tại và tương lai, phải giữ. Vi phạm là bug kiến
   vẫn chạy đầy đủ với provider classical.
 - **I16 (lossless).** Mọi asset ghi qua `AssetIndex` giải mã lại trùng từng byte với pixel đã đưa vào. Có
   test kiểm điều này cho mọi biến thể nén. Không đường code nào được biến đổi pixel asset (D19).
+- **I19 (nguồn gốc pixel).** Mỗi pixel RGB đưa vào `AssetIndex` là pixel của đúng một frame nguồn (sau resample
+  fps của 9.2), được chép không đổi. Kênh alpha là dữ liệu thêm, không thay RGB. Có test: mọi asset của một lần
+  compile được tìm lại được trong frame nguồn tại vị trí và frame ghi trong metadata của nó.
 - **I17 (không format).** Lõi không tham chiếu `OsbMpeg.Osb` và không chứa code sinh hay đọc văn bản `.osb`.
 - **I18 (trình tự ghi).** Mỗi channel FIFO theo trình tự thời gian. Channel object ghi `Order` tăng ngặt, đúng
   thứ tự trong file storyboard; một object chỉ được ghi khi nó đã xong và mọi object có `Order` nhỏ hơn đã được
@@ -904,8 +929,8 @@ internal sealed class ErrorMap
 
 ```text
 SegmentPlan            := [(t0, t1, CameraModel?, LayerProposal[], Gate kết quả)]
-LayerProposal          := { supportMask(t) mức block, Sim(2) track, footprint(t), zHint }
-ILayerProposer         := frames downscale → LayerProposal[]
+LayerProposal          := { supportMask(t) mức block, hardMask(t)?, Sim(2) track, footprint(t), zHint }
+ILayerProposer         := frames downscale → LayerProposal[]   (hai cài đặt: motion, vùng màu; D20)
 ILayerBoundaryRefiner  := (frames, supportMask(t)) → alpha(t) trong dải biên   (chỉ ở M2.5b, mục 10.2)
 ```
 
@@ -1433,16 +1458,20 @@ dõi X là biểu diễn *chính X* bằng một sprite di chuyển thay vì pat
 Contract, internal và in-proc:
 
 ```text
-LayerProposal          := { supportMask(t) mức block, Sim(2) track, footprint(t), zHint }
+LayerProposal          := { supportMask(t) mức block, hardMask(t)?, Sim(2) track, footprint(t), zHint }
 ILayerProposer         := frames (downscale, pass A) → LayerProposal[]
-                          block flow → sequential RANSAC Sim(2), K ≤ 4 → lọc liên thông ≥ diện tích
+  motion                  block flow → sequential RANSAC Sim(2), K ≤ 4 → lọc liên thông ≥ diện tích
                           tối thiểu → prior thời gian từ frame trước (tracking mô hình chuyển động,
                           không phải tracking object)
+  vùng màu (D20)          gom màu, màu trội làm nền, biên chia vùng (Zhang 2023) → khớp vùng giữa hai frame
+                          bằng Sim(2), xét tách, nhập, xuất hiện, biến mất → hardMask(t) ở độ phân giải pixel
 MovingRectProvider     : ICandidateProvider, rank 25, propose ở đầu đoạn theo gate 9.4
 ```
 
 Candidate: sprite là ảnh cắt bounding rect của support tại frame chuẩn (frame trong đoạn có support lớn
-nhất và ít bị che nhất theo sự kiện occlusion), pixel đặc, track `MX`, `MY`, `S`, `R` từ quỹ đạo qua
+nhất và ít bị che nhất theo sự kiện occlusion, tức lúc vật hiện ra lớn nhất như Zhang 2023), pixel đặc, hoặc khi
+proposal có `hardMask` thì alpha 0 ngoài mask và 1 trong mask trên chính pixel nguồn (không tạo pixel mới, D19),
+track `MX`, `MY`, `S`, `R` từ quỹ đạo qua
 `TrajectoryFitter` và easing rời rạc (9.8), ghép qua baker (I5). Chỉ cần rect của frame trước và frame hiện tại để
 dựng quỹ đạo; không lưu lịch sử rect, vì vùng lộ do `ErrorMap` tìm.
 
@@ -1463,6 +1492,9 @@ chèn ngay dưới layer thấp nhất (`Add(item, below)`, 7.3); patch giao foo
 | z giữa các layer | đồ thị ràng buộc từ sự kiện occlusion cộng duyệt hết thứ tự (K ≤ 4); mâu thuẫn thì giảm K |
 | X ra khỏi khung, X xuất hiện lại sau khi bị che hoàn toàn | đóng sprite; xuất hiện lại là layer mới, hash chuẩn hóa dùng lại asset nếu pixel trùng |
 | Group transform của video | ghép qua baker theo single-writer (I5) |
+| Hai vật chồng nhau, góc rect đặc của vật trên che vật dưới | `hardMask` từ vùng màu bỏ góc rect; không có mask thì vùng chồng thành lỗi đo được và vá |
+| Vật bán trong suốt (opacity < 1 đều trên cả vật) | chưa giải; ứng viên là sprite đặc kèm `F` < 1, chỉ đúng khi ước lượng được pixel đặc từ một frame vật nằm trên nền đã biết. OQ-7 |
+| Mép khử răng cưa của nội dung màu phẳng | `hardMask` cắt cứng nên dải mép 1 px lệch; closed loop vá; đo bằng bucket `layer-edge`. OQ-8 |
 
 Spike trước khi xây, pass/fail chốt trước, trên `authored`, `object_reveal_*`, `fish-short` và `minecraft`
 `standard`:
@@ -1487,21 +1519,23 @@ Bước phân rã chạy mỗi đoạn, trước vòng encode:
 
 ```text
 pass A, downscale  đề xuất layer, support mask và quỹ đạo như M2.5a
-pass A', full-res  tích lũy pixel trong hệ quy chiếu riêng của từng layer
-                   X: mẫu trong support của X; nền: mẫu ngoài mọi support foreground
-                   ước lượng bền vững: median khi đủ bộ nhớ, không thì trung bình có loại ngoại lai
-                   pixel chưa từng thấy: lấp bằng khuếch tán, confidence 0, không bao giờ được tin
-                   alpha từ biên (ILayerBoundaryRefiner classical: guided filter, trapped-ball)
-                   màu foreground F = (I − (1−α)·B)/α với B là nền đã dựng, kẹp khi α nhỏ
+pass A', full-res  dựng nền hai lượt trong hệ quy chiếu của nó (như 4.5)
+                   lượt một: trung vị theo thời gian chỉ để phát hiện pixel bị foreground che; ảnh trung vị bỏ đi
+                   lượt hai: mỗi vị trí lấy pixel của một frame thật nơi nó không bị che (D19, I19)
+                   pixel chưa từng thấy: để trống, không bịa; layer mép mềm trên vùng trống bị gate từ chối
+                   sprite X: crop thật tại frame chuẩn, không tích lũy
+                   alpha từ biên (ILayerBoundaryRefiner classical: guided filter, trapped-ball); RGB giữ nguyên
+                   pixel nguồn, không khử lem màu: quầng nền cũ ở mép là lỗi đo được, closed loop vá (bucket `layer-edge`)
 kiểm thử khô       như 9.4, trên composite các layer cộng nền
 pass B, encode     đặt nền và layer vào display list ở đầu đoạn, closed loop vá phần dư
 ```
 
-Dựng nền và dựng sprite X là cùng một phép toán: tích lũy trong hệ quy chiếu của một layer theo quỹ đạo và
-mask của chính nó; panorama khi camera động là trường hợp riêng. Lấp lỗ là bắt buộc chứ không phải tùy chọn:
-ở mép X alpha nhỏ hơn 1, nên lỗ trong suốt của nền sẽ lộ qua mép và vi phạm I14. Glow và flash dùng additive
-layer T9 trong cùng bước: trong hệ đã bù chuyển động, `Base` là percentile thấp theo thời gian, `Light` là max
-delta, `α(t)` đóng dạng, gate clamp ≤ 2% và SSIM. Chi phí thêm: một lần decode full-res mỗi đoạn có layer.
+Dựng nền và panorama là cùng một phép toán: ghép crop thật trong hệ quy chiếu của một layer theo quỹ đạo và
+mask của nó. Lỗ không được lấp bằng pixel bịa (D19), nên ràng buộc phủ kín I14 được giữ theo cách khác: layer có
+alpha nhỏ hơn 1 chỉ được nhận khi mọi pixel nền dưới dải mép của nó đã có pixel thật. Glow và flash dùng additive
+layer T9 trong cùng bước chỉ khi asset light là crop thật (ví dụ frame flash trên nền đen); mô hình
+`Base + α(t)·Light` với `Base` percentile và `Light` là ảnh hiệu bị REJECT vì tạo pixel (D19). Chi phí thêm: một
+lần decode full-res mỗi đoạn có layer.
 
 Spike A4 (additive trên glow thật) và A5 (chi phí GPU của sidecar, chỉ khi gate sidecar ở mục 12 mở) thuộc nấc này.
 Điều kiện nhận M2.5b: điều kiện nhận ở mục 12; trên `object_reveal_textured` bucket `reveal-strip` gần 0 và verify 100%.
@@ -1525,9 +1559,49 @@ gate chính với PSNR thấp hơn. Đây là điểm dừng chờ người duy 
 
 ### 11.2 Fixture và dataset
 
-Catalog fixture, profile (`native`, `quick`, `standard`, `full`), quy tắc chọn cửa sổ và lệnh sinh clip nằm duy
-nhất ở `tests/fixtures/README.md`. Quy tắc bắt buộc: medium và hard không bao giờ chạy ở độ dài, độ phân giải và
-fps gốc trừ khi người dùng yêu cầu rõ; chúng chạy trên clip dẫn xuất, và clip đó là *nguồn* cho mọi phép đo.
+Metadata của từng video và mô tả mỗi video đại diện cho gì nằm ở `tests/fixtures/README.md`. Cách dùng chúng nằm
+ở đây.
+
+**Quy tắc chính: không render thông tin không ai cần.** Medium và hard dài, độ phân giải và fps cao. Chúng không
+bao giờ chạy ở độ dài, độ phân giải và fps gốc trừ khi người dùng yêu cầu rõ; chúng chạy trên **clip dẫn xuất**,
+và clip đó là *nguồn* cho mọi phương pháp được so (simulator, encoder, verifier), nên chất lượng được đo so với
+clip chứ không so với video gốc. Easy đủ nhỏ để chạy nguyên bản.
+
+| Profile | Áp dụng | Cửa sổ | Chiều cao | fps | Dùng cho |
+| --- | --- | --- | --- | --- | --- |
+| `native` | easy, tier `authored` | cả video | gốc | gốc | mọi test và benchmark trên easy |
+| `quick` | medium, hard | 3 s | 360 (rộng `-2`) | `min(nguồn, 24)` | test trong vòng phát triển |
+| `standard` | medium, hard | 10 s | 720 (rộng `-2`) | `min(nguồn, 30)` | điều kiện nhận ở mục 12, hiệu chuẩn M0.5 |
+| `full` | medium, hard | cả video | gốc | gốc | **chỉ khi người dùng yêu cầu rõ** |
+
+Profile không bao giờ phóng to: nguồn thấp hơn chiều cao đích thì giữ chiều cao nguồn; nguồn có fps không quá
+trần thì bỏ filter fps.
+
+Chọn cửa sổ (`quick`, `standard`): bắt đầu ở `From = floor(0,25 × độ dài)`; nếu `From + dài > độ dài` thì
+`From = max(0, độ dài − dài)`. Loại cửa sổ nếu gần tĩnh (≥ 90% cặp frame liên tiếp có PSNR ≥ 50 dB) hoặc đen
+(luma trung bình < 10), dời tới một độ dài cửa sổ, thử tối đa 3 lần; đều bị loại thì giữ lần cuối và ghi vào
+manifest. Cửa sổ đã ghi thì **đóng băng** để các nấc sau so A/B được.
+
+Sinh clip một lần cho mỗi cặp (ID, profile), lưu cache và dùng lại:
+
+```text
+ffmpeg -y -ss <From> -i "<source>" -t <length> -an \
+  -vf "fps=fps=<fpsOut>:round=<R>,scale=-2:<H>:flags=area" \
+  -c:v libx264 -preset slow -crf 10 -pix_fmt yuv420p "<cache>/<profile>/<tier>-<name>.mp4"
+```
+
+- `fps` đặt trước `scale` để frame bị loại không bị scale; bỏ filter nào không cần.
+- `R` là giá trị `round` chọn bởi test ngữ nghĩa fps (9.2), cho ngữ nghĩa "frame bị loại được frame trước đại
+  diện". Trước khi test đó chạy, dùng `near` và ghi vào manifest.
+- CRF 10 gần như trong suốt; không cần lossless toán học vì mọi phương pháp đọc cùng một clip.
+- Cache ở `%TEMP%\osbmpeg-clips\`, cạnh mỗi clip là `<clip>.json` ghi đường dẫn nguồn, kích thước và mtime nguồn,
+  `From`, độ dài, W×H và fps đầu ra, `R`, phiên bản ffmpeg; sinh lại khi bất kỳ giá trị nào không khớp.
+- `easy/ball` là GIF; công cụ nào không đọc được thì chuẩn hóa một lần bằng `-c:v libx264 -crf 0 -pix_fmt yuv444p`.
+- `ffmpeg` và `ffprobe` phải có trên `PATH`, hoặc trỏ bằng biến môi trường `OSBMPEG_FFMPEG_DIR`.
+
+Tên fixture trong lịch sử đo của v1 (mục 17), đổi ở commit `f82dd56`: `short_animation_720p` là
+`medium/fish-short`, `bad_apple_fhd_60fps` là `medium/badapple`, `fish_spinning_fhd` là `medium/fish`,
+`birdbrain_realword_fhd` là `hard/birdbrain`, `minecraft_cinamic_fhd` là `hard/minecraft`.
 
 Fixture synthetic, sinh bằng script ffmpeg, mỗi cái kiểm một cơ chế:
 
@@ -1541,9 +1615,15 @@ Fixture synthetic, sinh bằng script ffmpeg, mỗi cái kiểm một cơ chế:
 | `pan_foreground_synthetic` | gate hai tầng | gate nhận hoặc từ chối đúng theo lợi ích ròng, kiểm cả hai nhánh bằng kích thước foreground |
 | `object_reveal_flat`, `object_reveal_textured` | layer rect, patch chèn dưới | xem 10.1 |
 
-Tier `authored` (motion graphics, UI, 2D animation, D14) gồm ba nguồn có ground truth ở mức chương trình: generator
-storyboard (`tools/OsbMpeg.DatasetGen`, 5.5), Crello Animation và Animation2Code (license ở README fixture). Nấc
-`DS` dựng tier này cùng metric tầng hai ở 5.5.
+Tier `authored` (motion graphics, UI, 2D animation, D14) gồm ba nguồn có ground truth ở mức chương trình, không
+nguồn nào được commit dưới dạng video. Nấc `DS` dựng tier này cùng metric tầng hai ở 5.5. Ba video `easy/*` là
+motion graphics đơn giản nhưng không có ground truth chương trình; chúng là smoke test trước khi tier này có mặt.
+
+| Nguồn | Ground truth | Cách lấy | License |
+| --- | --- | --- | --- |
+| Generator storyboard (`tools/OsbMpeg.DatasetGen`) | toàn bộ chương trình (`.osb` + asset), theo 5.5 | sinh theo seed, render bằng `SoftwareStoryboardRenderer`, encode x264 CRF 16 | của dự án |
+| Crello Animation (`cyberagent/crello-animation`, Hugging Face) | texture tĩnh mỗi sprite, ma trận affine và opacity mỗi frame; 50 frame ở 10 fps, 2 đến 6 layer, 299 template | script tải render mỗi template ra `.mp4` vào cache fixture | dataset CDLA-Permissive-2.0, người dùng phải chấp nhận license VistaCreate; file gốc không tái phân phối nên không commit bản render |
+| Animation2Code (`anim2code/dataset`, Hugging Face) | HTML/CSS/JS sinh ra video | script tải, render bằng môi trường của họ | kiểm dataset card trước khi dùng; không commit |
 
 ### 11.3 Attribution
 
@@ -1603,8 +1683,8 @@ triển khai cụ thể thuộc plan được sinh sau.
 | DS | Dataset ground truth, tier `authored`, metric tầng hai (5.5, 11.2) | M1 | là instrument; sai lệch tier rẻ so với render thật là phát hiện |
 | M2 | Display model có transform và alpha theo pixel; tầng phân tích đoạn; gate commit trước, vá sau; track camera | DS | `pan_synthetic` ≤ 1/5 bytes so với M1 trên cùng clip; `pan_foreground_synthetic` kiểm cả hai nhánh gate; đoạn bị từ chối trùng byte với M1; verify 100% |
 | EZ | Easing rời rạc cho mọi track (9.8) | M2 | ≥ 30% command bytes ít hơn trên `authored`, 0 verify regression; trên case generator "từng họ easing", easing đúng ở ≥ 90% case không mập mờ; trên medium và hard trùng byte hoặc nhỏ hơn M2 |
-| M2.5a | Layer nhân quả theo rect (10.1) | EZ | trên `authored`: bytes ≤ 0,5× và sprite ≤ 0,2× so với EZ, verify 100%; trên medium và hard bytes không tăng quá 2%; kỳ vọng `object_reveal_*` ở 10.1; trượt thì quay về DEFER |
-| M2.5b | Mask, alpha, dựng nền nhìn trước, khử lem màu (10.2) | M2.5a và bucket `rect-halo` hoặc `reveal-strip` ≥ 20% trên `authored` | bytes ≤ 0,7× M2.5a trên fixture kích hoạt nó, verify 100%, không fixture nào tệ đi |
+| M2.5a | Layer nhân quả theo rect, hai nguồn đề xuất, mask cứng từ vùng màu (10.1, D20) | EZ | trên `authored`: bytes ≤ 0,5× và sprite ≤ 0,2× so với EZ, verify 100%; trên medium và hard bytes không tăng quá 2%; kỳ vọng `object_reveal_*` ở 10.1; trượt thì quay về DEFER |
+| M2.5b | Alpha mềm ở biên, dựng nền nhìn trước bằng crop thật (10.2) | M2.5a và bucket `rect-halo` hoặc `reveal-strip` ≥ 20% trên `authored` | bytes ≤ 0,7× M2.5a trên fixture kích hoạt nó, verify 100%, không fixture nào tệ đi |
 | M3 | Ngân sách workload, Animation có cap, nén PNG lossless (9.9) | M2.5a (ngân sách và animation có thể sớm hơn nếu số đòi) | bad_apple giữ sàn với animation trong ngân sách; 100% asset giải mã trùng từng byte; không fixture nào vượt ngân sách mặc định hoặc có violation report rõ ràng |
 | OR | Oracle solver (11.4) | M3 | là instrument |
 | M3.5 | Attribution và quy trình quyết định (11.3, 11.5) | M3, OR | không phải feature |
@@ -1681,12 +1761,12 @@ Mỗi dòng một hướng, kèm điều kiện đảo quyết định. Không h
 | Global motion K=1 (T4) | R1 nội suy liên tục; 79 nghìn sprite là bằng chứng thiếu nó | thắng lớn nhất trên pan và zoom | trung bình | native (`M`, `S`) | MUST (M2), spike flow trước | spike flow (OQ-2) cho thấy flow không dùng được trên corpus thì thu hẹp về nội dung synthetic và game |
 | Sub-segment theo motion | scene tĩnh rồi pan rồi tĩnh là ca thường | mỗi segment một representation đúng | thấp | không đổi | MUST (M2) | không |
 | Layered motion K > 1, nấc rect nhân quả (T5, M2.5a) | nội dung được author là nhiều vật độc lập (D14); closed loop đã tự vá nền vừa lộ (4.8) | lớn trên `authored`, chưa rõ trên phần còn lại | trung bình | tốt (K sprite xếp z, patch vá chèn dưới) | MUST (M2.5a, sau R2) với keep-gate: trên `authored` bytes ≤ 0,5× và sprite ≤ 0,2× so với M2, verify 100%; trên medium và hard bytes không tăng quá 2% | trượt gate thì quay về DEFER tới M3.5 |
-| Mask, alpha, dựng nền nhìn trước, khử lem màu cho layer (M2.5b) | chỉ xóa được phần dải lộ và quầng nền mà nấc a để lại (4.8) | bằng tổng hai bucket `rect-halo` và `reveal-strip` | cao, thêm một pass full-res | tốt (T12) | DEFER tới sau M2.5a | `rect-halo` hoặc `reveal-strip` ≥ 20% bytes trên `authored` |
+| Alpha mềm, dựng nền nhìn trước bằng crop thật cho layer (M2.5b) | chỉ xóa được phần dải lộ và quầng nền mà nấc a để lại (4.8) | bằng tổng hai bucket `rect-halo` và `reveal-strip` | cao, thêm một pass full-res | tốt (T12) | DEFER tới sau M2.5a | `rect-halo` hoặc `reveal-strip` ≥ 20% bytes trên `authored` |
 | Panorama (T6) | toán khả thi (4.5); strip giải được giới hạn texture | cận dưới bytes cho pan dài | trung bình | tốt | DEFER tới M3.5 | bucket `pan-reveal` từ 25 tới 30% |
 | Tái dùng asset chuẩn hóa | hash đã có; chuẩn hóa là mở rộng key (I10) | lớn nếu bucket near-dup lớn | thấp tới trung bình | hoàn hảo | DEFER tới M3.5 | bucket `near-duplicate-assets` từ khoảng 20% |
 | Perspective strips | similarity thiếu shear, sai hệ thống và đo được | vừa, tùy nội dung | trung bình | chấp nhận được | DEFER tới M3.5 | bucket `perspective-residual` từ 25% |
 | Suy luận occlusion riêng | là hệ quả của z-order cộng closed loop (4.3) | 0, vì đã có sẵn | không | không | REJECT (như một feature) | tìm ra ca mà closed loop không tự xử lý được |
-| Object detection và tracking ngữ nghĩa làm xương sống (SAM 2/3) | lệch granularity (4.6); lợi ích identity đã có đường rẻ hơn (4.4); SAM 2 tự ghi nhận mất track qua che khuất dài, lẫn object giống nhau, không tự liệt kê object | thấp so với giá | cao, GPU, PyTorch | kém | REJECT (D12) | không |
+| Object detection và tracking ngữ nghĩa làm xương sống (SAM 2/3) | lệch granularity (4.6); lợi ích identity đã có đường rẻ hơn (4.4); SAM 2 tự ghi nhận mất track qua che khuất dài, lẫn object giống nhau, không tự liệt kê object | thấp so với giá | cao, GPU, PyTorch | kém | REJECT (D12) | layer theo vật (mask từ model) rẻ hơn ≥ 30% bytes so với motion layer sau M2.5b trên một fixture, verify 100% |
 | Model học tinh chỉnh biên layer (`ILayerBoundaryRefiner`: SAM, MatAnyone) | biên là chỗ duy nhất model học hơn classical | nhỏ trên `authored`, vừa trên footage | trung bình, nằm ngoài assembly (sidecar Python) | tốt, chỉ đổi alpha ở dải biên | DEFER tới sau M3.5 (D13) | bucket "mép layer" ≥ 20% bytes, hoặc verify fail tập trung ở biên layer trên 2D animation |
 | Depth estimation model | z-order suy được từ dữ liệu occlusion (5.2) | thấp | cao | gián tiếp | REJECT | layered motion bế tắc riêng vì không suy được thứ tự z |
 | Learned optical flow | classical khớp đúng granularity rect (4.6) | chỉ khi classical fail | cao (ONNX, model, GPU) | không đổi | REJECT ở giai đoạn này | spike flow và cả DIS flow đều fail trên một bucket lớn |
@@ -1711,6 +1791,9 @@ Mỗi dòng một hướng, kèm điều kiện đảo quyết định. Không h
 | Nền động hoặc vùng lớn bằng `Animation` | R4: N frame full-res resident cùng lúc, 1080p × 300 frame xấp xỉ 2,4 GB | âm | không đổi | nổ memory | REJECT; `Animation` chỉ cho vùng nhỏ với cap resident bytes (M3) | không |
 | Cost function dự đoán với trọng số tay (asset, command, overdraw) | predict thua measure 2,6 đến 5,4 lần (17.5); ba trục workload là vách đá chứ không phải dốc (1.3) | âm | không đổi | không đổi | REJECT; chi phí đo thật, ràng buộc cứng | không |
 | Freeze gate so frame t+1 với frame t | chính là vòng hở gây mờ của v1 (17.1) | âm | không đổi | không đổi | REJECT; chỉ so với asset đang hiển thị trên composite | không |
+| Vùng màu liền làm nguồn đề xuất layer thứ hai | flow theo block yếu trên vùng một màu (OQ-2); Zhang 2023 cắt bằng vùng màu trên đúng loại nội dung ưu tiên | lớn trên `authored` và `easy/*` | thấp tới trung bình | tốt | MUST (M2.5a, D20) | trên `authored`, đề xuất từ vùng màu không làm giảm bytes so với chỉ motion |
+| Mask cứng từ vùng màu (alpha 0/1 trên pixel nguồn) | rect đặc che vật bên dưới khi hai vật chồng nhau (`easy/complex`); mask không tạo pixel nên đúng D19 | vừa, trên nội dung chồng lớp | thấp | tốt (T12 không feather) | MUST (M2.5a, D20) | bucket `layer-edge` do mép cứng lớn hơn phần tiết kiệm |
+| Pixel tổng hợp trong asset: trung vị hay percentile nền, khuếch tán lấp lỗ, khử lem màu, ảnh hiệu additive, khử nhiễu, lớp grain tổng hợp | người dùng chốt tái hiện nguyên vẹn (D19, 2026-11-17) | dương về bytes trên nội dung nhiễu, nhưng sai mục tiêu | thấp | được | REJECT vĩnh viễn (D19, I19) | không |
 
 ---
 
@@ -1725,6 +1808,8 @@ Mỗi dòng một hướng, kèm điều kiện đảo quyết định. Không h
 | OQ-3 | Con số preset cuối cùng | phụ thuộc nội dung | M0.5 | chờ người dùng xem ảnh, không tự chốt |
 | OQ-5 | Ngữ nghĩa alive chính xác cho `WorkloadAnalyzer` (alpha lớn hơn 0 lần đầu so với span command) | ảnh hưởng độ chính xác report, không ảnh hưởng output | hỏi cụ thể qua deepwiki khi cần | dùng bản bảo thủ (span command) tới lúc đó |
 | OQ-6 | osu! stable và lazer có đọc đúng PNG grayscale và PNG indexed không | nén lossless ở 9.9 dùng các biến thể này; chưa verify trên client | spike thủ công trước M3 | khoảng 30 phút; fail thì chỉ giữ biến thể RGB và RGBA, không tìm cách lách |
+| OQ-7 | Biểu diễn vật bán trong suốt (`easy/complex`) thế nào khi asset phải là crop thật | crop của vật bán trong suốt đã trộn nền; sprite đặc kèm `F` cần pixel đặc mà không frame nào có | thử trên `easy/complex` ở M2.5a | không giải được thì để closed loop vá vùng chồng |
+| OQ-8 | Mép khử răng cưa của nội dung màu phẳng: mask cứng hay alpha mềm từ crop thật | alpha mềm cần tách màu mép, mà khử lem màu bị cấm (D19) | đo bucket `layer-edge` ở M2.5a | giữ mask cứng, closed loop vá dải mép |
 
 ### 15.2 Giả định cần xác minh trước khi tin số đo
 
@@ -1759,12 +1844,47 @@ khối như thể nó mới, và để biết lấy công cụ ở đâu.
 | Một texture + biến dạng theo frame | Ye et al., *Deformable Sprites*, CVPR 2022; Kasten et al., *Layered Neural Atlases*, SIGGRAPH Asia 2021 (atlas tĩnh, kém sau 100 frame) | chỉ làm detector cho fall-through; osu! không có primitive biến dạng |
 | Object kèm effect (bóng, phản xạ, khói) | Lu et al., *Omnimatte*, CVPR 2021 (nền homography tĩnh); OmnimatteRF, ICCV 2023; Lee et al., *Generative Omnimatte*, CVPR 2025 | ngoài phạm vi; bóng đổ là nhân tối nên về lý thuyết map được sang `C` trên sprite phụ, chưa ai thử |
 | Segmentation và tracking | SAM 2 (ICLR 2025; Appendix C: fail qua shot change, lẫn object giống nhau, mất track sau che khuất dài, mỗi object chạy riêng; 24 đến 47 fps mỗi object trên A100); SAM 3 (11/2025, prompt bằng khái niệm, detector + tracker); SAM 3.1 Object Multiplex (03/2026) | chỉ qua `ILayerBoundaryRefiner` có gate (D13) |
-| Matting và khử lem màu | Yang et al., *MatAnyone*, CVPR 2025 (mask frame đầu, memory propagation); Germer et al., *Fast Multi-Level Foreground Estimation*, ICPR 2020; Forte và Pitié, *FBA Matting*, 2020 | thay mọi công thức trimap tự sinh hay chia cho α; chỉ trong sidecar |
-| Nền amodal | Granados 2012 (camera động, graph cut); Zhou et al., *ProPainter*, ICCV 2023 (fail khi vùng che chưa từng lộ); Hudson và Smith, *Track Anything Behind Everything* (generative) | lấy: median trong hệ panorama, lỗ để trong suốt cho closed loop vá; bỏ: generative vì ảo giác |
-| Base + α(t)·Light | Sunkavalli et al., *Factored Time-Lapse Video*, SIGGRAPH 2007; Ye et al., *Intrinsic Video*, SIGGRAPH 2014; về toán là NMF hạng 1 | chỉ đúng trong hệ sprite đã bù chuyển động; base theo percentile thấp, không min |
+| Matting và khử lem màu | Yang et al., *MatAnyone*, CVPR 2025 (mask frame đầu, memory propagation); Germer et al., *Fast Multi-Level Foreground Estimation*, ICPR 2020; Forte và Pitié, *FBA Matting*, 2020 | chỉ lấy alpha; màu foreground ước lượng (khử lem màu) bị cấm vì là pixel bịa (D19); chỉ trong sidecar |
+| Nền amodal | Granados 2012 (camera động, graph cut); Zhou et al., *ProPainter*, ICCV 2023 (fail khi vùng che chưa từng lộ); Hudson và Smith, *Track Anything Behind Everything* (generative) | lấy: trung vị chỉ để tìm mover, pixel dán từ frame thật, lỗ để trống cho closed loop vá; bỏ: generative và inpaint vì bịa pixel (D19) |
+| Base + α(t)·Light | Sunkavalli et al., *Factored Time-Lapse Video*, SIGGRAPH 2007; Ye et al., *Intrinsic Video*, SIGGRAPH 2014; về toán là NMF hạng 1 | bỏ dạng tổng hợp vì `Base` percentile và `Light` ảnh hiệu là pixel bịa (D19); T9 chỉ dùng với crop thật |
 | Layer theo motion, không theo ngữ nghĩa | Wang và Adelson, *Representing Moving Images with Layers*, IEEE TIP 1994; object-centric learning (SAVi++, NeurIPS 2022) còn yếu trên video thật khi không có điều kiện | là khung của mục 4.1 |
 | Keyframe và easing | Roberts, PhD 2018 (optimal keyframe selection giống animator); Nowicki, Cowan, Mann, GI 2019; Sawicki 2020 (Bézier tổng quát hóa easing); PELT (Killick 2012); PVLDB 2018 trajectory simplification study. Không có paper riêng cho nhận dạng easing từ quỹ đạo | `EZ` là contribution nhỏ nhưng thật, nếu có ground truth |
 | De-rendering animation sang code | Ji et al., *Animation2Code*, NeurIPS 2026: 1.069 web animation, VLM đạt appearance ~0,8 nhưng temporal similarity ~0,3 kể cả sau fine-tune; Liang et al., *VAnim*, ICML 2026 | bằng chứng bài toán chưa bị mô hình lớn giải; dataset dùng cho tier `authored` (kiểm license trước) |
+| SAM làm bộ cắt, chuyển động quyết định gộp | Yang et al., *LayerAnimate*, ICCV 2025 (SAM và SAM 2 cắt quá vụn, gộp mảnh theo điểm chuyển động bằng phân cụm phân cấp); Huang et al., *Segment Any Motion in Videos*, CVPR 2025 (quỹ đạo điểm dài chọn vật, SAM 2 chỉ cắt mép; fail khi vật nhanh chỉ hiện vài frame hoặc mọi thứ chuyển động giống nhau) | bằng chứng cho D12 và D13: chuyển động đề xuất, model chỉ cắt mép |
+| Tự liệt kê và bám mọi vật | Ye et al., *EntitySAM*, CVPR 2025; Cheng et al., *DEVA*, ICCV 2023 (phát hiện vật mới trễ theo chu kỳ chạy lại bộ cắt) | ứng viên cho điều kiện đảo của D12; chỉ trong sidecar |
+| Ghép lớp khả vi theo Sim(2) | Reddy et al., *Discovering Pattern Structure Using Differentiable Compositing*, SIGGRAPH Asia 2020 | nền của Zhang 2023; tối ưu đúng bộ biến đổi osu! có |
+| Ảnh ghép nền từ camera chuyển động | Irani et al., *Efficient Representations of Video Sequences*, 1996; MPEG-4 sprite coding hai lượt (Waseda R03): trung vị tìm foreground, dán pixel thật cho ảnh nét | lấy: cách hai lượt cho 4.5 và 10.2, đúng D19 |
+| Từ điển sprite dùng chung cả video | Smirnov et al., *MarioNette*, NeurIPS 2021 | ý của canonical asset (4.4); bỏ phương pháp (lưới neo, luyện mạng) |
+| Tách grain khỏi nội dung | Norkin và Birkbeck, *Film Grain Synthesis for AV1*, DCC 2018 (khử nhiễu, gửi tham số, tổng hợp lại; tới 50% bytes) | REJECT cho asset (D19): khử nhiễu và grain tổng hợp đều đổi pixel |
+
+### 16.1 Nguồn đã xác minh
+
+DOI tra qua Crossref, số arXiv qua arXiv, ngày 2026-11-17.
+
+- Zhang, Ma, Wu, Ritchie, Agrawala. Editing Motion Graphics Video via Motion Vectorization and Transformation. *ACM TOG* 42(6), 2023. doi:[10.1145/3618316](https://doi.org/10.1145/3618316)
+- Suzuki, Kikuchi, Yamaguchi. Fast Sprite Decomposition from Animated Graphics. *ECCV 2024*, LNCS, 200–215. doi:[10.1007/978-3-031-72855-6_12](https://doi.org/10.1007/978-3-031-72855-6_12)
+- Zhang, Wong, Liu. Sprite-from-Sprite. *ACM TOG* 41(6), 2022. doi:[10.1145/3550454.3555439](https://doi.org/10.1145/3550454.3555439)
+- Reddy, Guerrero, Fisher, Li, Mitra. Discovering Pattern Structure Using Differentiable Compositing. *ACM TOG* 39(6), 2020. doi:[10.1145/3414685.3417830](https://doi.org/10.1145/3414685.3417830)
+- Wang, Adelson. Representing Moving Images with Layers. *IEEE TIP* 3(5), 625–638, 1994. doi:[10.1109/83.334981](https://doi.org/10.1109/83.334981)
+- Irani, Anandan, Bergen, Kumar, Hsu. Efficient Representations of Video Sequences and Their Applications. *Signal Processing: Image Communication* 8(4), 327–351, 1996. doi:[10.1016/0923-5965(95)00055-0](https://doi.org/10.1016/0923-5965(95)00055-0)
+- Sprite Coding in Object-based Video Coding Standard: MPEG-4 (Waseda R03). <https://www.ams.giti.waseda.ac.jp/data/pdf-files/R03.pdf>. Tác giả và năm chưa xác minh.
+- Lu, Cole, Dekel, Zisserman, Freeman, Rubinstein. Omnimatte. *CVPR 2021*. doi:[10.1109/CVPR46437.2021.00448](https://doi.org/10.1109/cvpr46437.2021.00448)
+- Lee, Lu, Rumbley, Geyer, Huang, Dekel, Cole. Generative Omnimatte. *CVPR 2025*, 12522–12532. doi:[10.1109/CVPR52734.2025.01168](https://doi.org/10.1109/cvpr52734.2025.01168)
+- Kasten, Ofri, Wang, Dekel. Layered Neural Atlases for Consistent Video Editing. *ACM TOG* 40(6), 2021. doi:[10.1145/3478513.3480546](https://doi.org/10.1145/3478513.3480546)
+- Ye, Li, Tucker, Kanazawa, Snavely. Deformable Sprites for Unsupervised Video Decomposition. *CVPR 2022*. arXiv:[2204.07151](https://arxiv.org/abs/2204.07151)
+- Smirnov, Gharbi, Fisher, Guizilini, Efros, Solomon. MarioNette. *NeurIPS 2021*. arXiv:[2104.14553](https://arxiv.org/abs/2104.14553)
+- Ravi et al. SAM 2: Segment Anything in Images and Videos. 2024. arXiv:[2408.00714](https://arxiv.org/abs/2408.00714)
+- Ye, Oh, Ke, Lee. EntitySAM: Segment Everything in Video. *CVPR 2025*. <https://github.com/ymq2017/entitysam>
+- Cheng, Oh, Price, Schwing, Lee. Tracking Anything with Decoupled Video Segmentation. *ICCV 2023*, 1316–1326. doi:[10.1109/ICCV51070.2023.00127](https://doi.org/10.1109/iccv51070.2023.00127)
+- Huang, Zheng, Xu, Keutzer, Zhang, Kanazawa, Wang. Segment Any Motion in Videos. *CVPR 2025*, 3406–3416. doi:[10.1109/CVPR52734.2025.00323](https://doi.org/10.1109/cvpr52734.2025.00323)
+- Yang, Fan, Lin, Wang, Zhang. LayerAnimate: Layer-level Control for Animation. *ICCV 2025*, 10865–10874. doi:[10.1109/ICCV51701.2025.01011](https://doi.org/10.1109/iccv51701.2025.01011)
+- Yang, Zhou, Zhao, Tao, Loy. MatAnyone. *CVPR 2025*, 7299–7308. doi:[10.1109/CVPR52734.2025.00684](https://doi.org/10.1109/cvpr52734.2025.00684)
+- Norkin, Birkbeck. Film Grain Synthesis for AV1 Video Codec. *DCC 2018*, 3–12. doi:[10.1109/DCC.2018.00008](https://doi.org/10.1109/dcc.2018.00008)
+- Roberts, Lewis, Anjyo, Seo, Seol. Optimal and Interactive Keyframe Selection for Motion Capture. *Computational Visual Media*, 2019. doi:[10.1007/s41095-019-0138-z](https://doi.org/10.1007/s41095-019-0138-z)
+- ppy/osu issue #7257: Overlapping storyboard commands behave differently from stable. <https://github.com/ppy/osu/issues/7257>
+
+Các nguồn khác trong bảng trên (Granados 2012, ProPainter, SAM 3, Animation2Code, VAnim, Sunkavalli 2007 và các
+nguồn của mục 17) chưa được xác minh trong lần đối chiếu này.
 
 ---
 

@@ -1,14 +1,12 @@
 # Test fixtures
 
-This file is the single source of truth for the test and benchmark videos: which fixtures exist, which
-profile each one is run at, and how the derived clips are generated. `docs/pipeline.md` refers to it and
-does not repeat it.
+The videos used for tests and benchmarks, and what each one stands for. Every file is stored through
+Git LFS (`*.mp4` and `*.gif`, see `.gitattributes`). How they are used (clip profiles, pipeline
+stages) is described in `docs/direction.md`.
 
-Every video is stored through Git LFS (`*.mp4` and `*.gif`, see `.gitattributes`).
+## Metadata
 
-## Catalog
-
-Metadata is from ffprobe (2026-09-29).
+From ffprobe (2026-09-29).
 
 | ID | File | Resolution | fps | Duration | Frames |
 | --- | --- | --- | --- | --- | --- |
@@ -24,96 +22,39 @@ Metadata is from ffprobe (2026-09-29).
 | `hard/rollback` | `hard/rollback.mp4` | 1920×1080 | 24 | 155.1 s | 3720 |
 | `hard/minecraft` | `hard/This is Minecraft.mp4` | 1920×804 | 24000/1001 | 103.5 s | 2481 |
 
-The rename in commit `f82dd56` shows how these relate to the names used in the v1 measurement history
-(`docs/pipeline.md` section 17):
+## What each fixture represents
 
-| Old name | Current ID |
-| --- | --- |
-| `short_animation_720p` | `medium/fish-short` |
-| `bad_apple_fhd_60fps` | `medium/badapple` |
-| `fish_spinning_fhd` | `medium/fish` |
-| `birdbrain_realword_fhd` | `hard/birdbrain` |
-| `minecraft_cinamic_fhd` | `hard/minecraft` |
+Scene-cut counts are estimates from ffmpeg's `scene` filter at threshold 0.3 on a 320-pixel-wide
+downscale.
 
-## Main rule: never render information nobody needs
+### Easy: flat motion graphics
 
-The medium and hard videos are long, high-resolution and high frame rate. Tests and benchmarks **must
-not** run on them at native length, resolution and fps unless the user explicitly asks for it. They run
-on a **derived clip** instead: a short window, scaled down, with the frame rate capped. That derived clip
-becomes the *source* for every method being compared (the v1 baseline, the simulator, the new encoder
-and the verifier). A/B comparisons therefore stay fair, and quality is measured against the clip, not
-against the original video.
+Few objects, flat colours, white background. A correct result is a handful of sprites and a short
+command list.
 
-The easy videos are already small, so they run at native settings.
+| ID | Content | What it tests |
+| --- | --- | --- |
+| `easy/ball` | 8-frame GIF (content not reviewed when this table was written) | Very short input; GIF decoding |
+| `easy/complex` | Two circles that move, overlap with blended colours, fade, and one that grows until it fills the screen | Semi-transparent objects whose overlap is a blended colour, not a third object; choosing the largest, sharpest view of an object as its source image |
+| `easy/overlap` | A ring passing over a filled dot | Layer order between two objects that cross |
+| `easy/sequence` | Circles that move, change colour gradually, scale, overlap, and leave the frame | Colour change expressed as a command; objects entering and leaving the frame |
 
-## Profiles
+### Medium: one difficulty at a time
 
-| Profile | Applies to | Window | Height | fps | Used for |
-| --- | --- | --- | --- | --- | --- |
-| `native` | easy | whole video | native | native | every test and benchmark on easy |
-| `quick` | medium, hard | 3 s | 360 (width `-2`, i.e. aspect-preserving and even) | `min(source, 24)` | fixture tests during the development loop |
-| `standard` | medium, hard | 10 s | 720 (width `-2`) | `min(source, 30)` | capability acceptance (`docs/pipeline.md` §12), M0.5 calibration |
-| `full` | medium, hard | whole video | native | native | **only when the user explicitly asks**, e.g. checking a performance projection |
-
-A profile never scales **up**. If the source height is at or below the target height, it keeps the
-source height. Likewise the fps filter is skipped when the source fps is already at or below the cap.
-
-## Choosing the window (`quick` and `standard`)
-
-1. The candidate window starts at `From = floor(0.25 × duration)` seconds and lasts as long as the profile
-   says. If `From + length > duration`, use `From = max(0, duration − length)` instead.
-2. Reject the window if either of these holds:
-   - it is near-static: at least 90% of consecutive frame pairs have PSNR ≥ 50 dB;
-   - it is black: the window's mean luma is below 10.
-3. If the window is rejected, move it forward by one window length and check again, up to 3 times. If
-   every attempt is rejected, keep the last one and note it in the manifest.
-4. Record the chosen window in the table below. Once recorded it is **frozen**: later milestones use the
-   same windows so their A/B results remain comparable.
-
-| ID | `quick` From | `standard` From | Note |
+| ID | Content | Scene cuts | What it tests |
 | --- | --- | --- | --- |
-| *(filled in the first time the clips are generated)* | | | |
+| `medium/fish-short` | Static line-art panels with captions; only a mouth and a small fish on a phone screen change | not counted | Small patches on a static background |
+| `medium/fish` | One 3D-rendered fish rotating on a white background, slowly shrinking | 1 | Repetition that is close but not exact; reuse of an image at a different size; animation memory limits |
+| `medium/badapple` | Two-colour silhouettes that morph continuously, soft edges, 60 fps | 3 | Shapes that never hold still; only the boundary between black and white changes; large flat regions |
 
-## Generating a clip
+### Hard: several difficulties at once
 
-Run this once per (ID, profile) pair, write the result into the cache, and reuse it afterwards:
-
-```text
-ffmpeg -y -ss <From> -i "<source>" -t <length> -an \
-  -vf "fps=fps=<fpsOut>:round=<R>,scale=-2:<H>:flags=area" \
-  -c:v libx264 -preset slow -crf 10 -pix_fmt yuv420p "<cache>/<profile>/<tier>-<name>.mp4"
-```
-
-- Put `fps` before `scale`, so dropped frames are never scaled. Drop whichever filter is not needed
-  (see the no-upscale and no-cap rules above).
-- `R` is the `round` value chosen by the fps-semantics test (`docs/pipeline.md` §9.2), which gives the "a
-  dropped frame is represented by the frame before it" semantics. Until that test has run, use `near` and
-  write that into the manifest.
-- `flags=area` avoids aliasing when downscaling.
-- CRF 10 is effectively transparent. It does not need to be mathematically lossless, because every method
-  reads the same clip.
-- Cache: `%TEMP%\osbmpeg-clips\`. Next to each clip write `<clip>.json`, recording the source path, the
-  source size and mtime, `From`, the length, the output W×H, the output fps, `R`, and the ffmpeg version.
-  Regenerate a clip whenever any of these no longer matches.
-- `easy/ball` is a GIF. If a tool cannot read it directly, normalize it once losslessly with
-  `-c:v libx264 -crf 0 -pix_fmt yuv444p`.
-
-## Prerequisites
-
-`ffmpeg` and `ffprobe` must be on `PATH`. On the machine these fixtures were probed on, the only copy was
-the one bundled with Krita (`C:\Program Files\Krita (x64)\bin`), and it was not on `PATH`. The plans
-support the environment variable `OSBMPEG_FFMPEG_DIR` to point at that folder.
-
-## Planned tier: `authored` (decision D14, 2026-10-29)
-
-Motion graphics, UI and 2D animation are the priority content and none of the tiers above contain any.
-The `authored` tier is built right after M1 (capability `DS` in `docs/pipeline.md` §12). It has
-three sources, none of which is committed as video:
-
-| Source | Ground truth | How it gets here | License note |
+| ID | Content | Scene cuts | What it tests |
 | --- | --- | --- | --- |
-| Storyboard generator (`tools/OsbMpeg.DatasetGen`) | full program (`.osb` + assets), per `docs/pipeline.md` §5.5 | generated with a seed, rendered by `SoftwareStoryboardRenderer`, encoded with ffmpeg x264 CRF 16 | ours |
-| Crello Animation (`cyberagent/crello-animation` on Hugging Face) | per-sprite static texture, per-frame affine matrix and opacity; 50 frames at 10 fps, 2 to 6 layers, 299 templates | download script renders each template to `.mp4` into the fixture cache | CDLA-Permissive-2.0 for the dataset, and the user must accept the VistaCreate license; original files are not redistributed, so do not commit renders |
-| Animation2Code (`anim2code/dataset` on Hugging Face) | HTML/CSS/JS that produced the video | download script, videos rendered deterministically by their environment | check the dataset card license before use; do not commit |
+| `hard/birdbrain` | A flat-drawn character dancing over handheld real footage | 110 | An object that changes pose every drawing but is clearly one sprite; noisy, shaking background; clean edges when the background changes |
+| `hard/machinelove` | Real footage of a laptop whose screen plays animation, with subtitles on top | 150 | Sprites that survive a scene cut (subtitles); a tilted screen-in-screen; pixelated glitch frames |
+| `hard/rollback` | Dense motion graphics with film grain, blur, glow, camera shake, and tilted 3D planes | 127 | Very short scenes (about 1.2 s); full-screen effects; hundreds of small elements; perspective that sprites cannot express |
+| `hard/minecraft` | A camera flying through a 3D world, with particles and flashes to white | 63 | True 3D motion, where nothing slides as a flat piece; flashes handled as an additive layer |
 
-Runs at `native` since all of it is short and small. Window selection rules above do not apply.
+`hard/minecraft` and the 3D parts of `hard/rollback` are expected to fall back to redrawing most
+frames. They are in the set to check that the fallback stays correct, not to be compressed well.

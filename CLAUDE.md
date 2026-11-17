@@ -19,9 +19,9 @@ pass straight through to output IR unchanged.
 
 ## Read this before designing anything
 
-`docs/pipeline.md` is the single design document. It explains the whole pipeline: the product and its
+`docs/direction.md` is the single design document. It explains the whole pipeline: the product and its
 goals, what osu! storyboards can express, the representation space and strategy, every settled decision
-(D1 to D19) and invariant (I1 to I18), the architecture and public API, each step of one compile in time
+(D1 to D20) and invariant (I1 to I19), the architecture and public API, each step of one compile in time
 order, moving objects and backgrounds, how things are measured, the capability ladder with acceptance
 conditions, rejected directions with the condition that would reverse each one, prior art, lessons paid
 for by v1, and which v1 components are reused. It contains no implementation steps: the implementation
@@ -37,15 +37,17 @@ Three things that document settles, and that cost real time to re-derive:
 - The target is a library that extracts one video into OsuParsers objects, written into caller-supplied
   channels split by kind (objects in storyboard file order, assets and progress in time order), with assets written to a caller-given storage.
   The core never writes `.osb`; that lives in the outer `OsbMpeg.Osb` project. Assets are always
-  lossless: no quantization, approximate palette, dither or lossy format, ever; the quality floor
-  applies only to representations. There is no CLI, no `.osbv`, no tuner and no scene pre-pass. The unit of work is a coherent change, not a semantic object:
-  layers are proposed from motion and accepted only when the closed loop measures them cheaper.
+  lossless and every RGB pixel is copied unchanged from exactly one source frame: no quantization,
+  approximate palette, dither, lossy format, temporal median or percentile, inpainting, colour
+  decontamination or denoising, ever (D19, I19); the quality floor applies only to representations. There is no CLI, no `.osbv`, no tuner and no scene pre-pass. The unit of work is a coherent change, not a semantic object:
+  layers are proposed from motion or from flat colour regions (D20) and accepted only when the
+  closed loop measures them cheaper.
   Learned models (SAM, matting) are allowed only as an optional boundary refiner in a separate
   process, behind a measured gate.
 - Several plausible directions are already ruled out with measurements, including motion/residual
   compensation against a fixed grid, alpha-masked asset trimming, an RDO or hand-weighted cost layer,
   heatmap-adaptive tile partitioning, semantic tracking as the backbone, near-duplicate asset swaps
-  without pixel verification, and dynamic backgrounds as `Animation`. Check `docs/pipeline.md` section 14
+  without pixel verification, and dynamic backgrounds as `Animation`. Check `docs/direction.md` section 14
   (decision table) and section 17 (lessons from v1) before proposing any of them again.
 
 ## Commands
@@ -108,7 +110,7 @@ orchestrator, where a folder is a system boundary:
   eval sample so a candidate that overfits the train clip gets rejected. A scene no longer than
   `RequiredSampleMs` skips the eval split and tunes against its own full span, since that scene is
   the deliverable rather than a sample of something bigger (see `BuildSampleWindows`). Runs lazily,
-  only for a scene `VideoCompiler` is actually about to encode. Note that `docs/pipeline.md`
+  only for a scene `VideoCompiler` is actually about to encode. Note that `docs/direction.md`
   retires this whole system: the relative floor it optimizes toward is the root cause of the blur.
 - `Encode/` has `TileEncodeLoop`, the shared decode, track, merge, detect, emit loop used by both the
   `.osbv` per-`AnimationVideo` path and the legacy whole-canvas `EncodePipeline` and `bench` path.
